@@ -1,0 +1,9 @@
+name = GSB Migrate
+description = Migrate content from legacy GSB D7 site to GSB Revamp
+package = GSB
+core = 7.x
+
+dependencies[] = migrate
+
+files[] = node.inc
+
