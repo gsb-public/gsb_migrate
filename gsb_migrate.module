@@ -5,3 +5,48 @@
  * This module uses Migrate framework to migrate legacy GSB D7 data into fancy new GSB Revamp project.
  */
 
+/**
+ * Implements hook_flush_caches().
+ */
+function gsb_migrate_flush_caches() {
+  gsb_migrate_register_migrations();
+}
+
+/**
+ * Register all migrations.
+ */
+function gsb_migrate_register_migrations() {
+  /**
+   * Each migration being registered takes an array of arguments, some required
+   * and some optional. Start with the common arguments required by all - the
+   * source_connection (connection key, set up in settings.php, pointing to
+   * the Drupal 6 database), source_version (major version of Drupal), and
+   * group_name (a.k.a. import job).
+   */
+  $common_arguments = array(
+    'source_connection' => 'gsb_legacy',
+    'source_version' => 7,
+    'group_name' => 'content',
+    'version_class' => 'GSBDrupal',
+  );
+
+  // Node migrations - each has its own class derived from the migrate_d2d class,
+  // specifying its particular field mappings and transformations. source_type
+  // and destination_type are required arguments.
+  $node_arguments = array(
+    array(
+      'class_name' => 'GSBFacultyD2DMigration',
+      'description' => t('Migration of Faculty profile2 entities into Faculty CT nodes'),
+      'machine_name' => 'GSBFacultyD2D',
+      'source_type' => 'faculty',
+      'destination_type' => 'faculty',
+      'default_uid' => 1,
+    ),
+  );
+
+  foreach ($node_arguments as $arguments) {
+    $arguments = array_merge_recursive($arguments, $common_arguments);
+    Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
+      $arguments);
+  }
+}
