@@ -6,6 +6,17 @@
  */
 
 /**
+ * Implements hook_migrate_api().
+ */
+function gsb_migrate_migrate_api() {
+  $api = array(
+    'api' => 2,
+  );
+
+  return $api;
+}
+
+/**
  * Implements hook_flush_caches().
  */
 function gsb_migrate_flush_caches() {
@@ -35,9 +46,9 @@ function gsb_migrate_register_migrations() {
   // and destination_type are required arguments.
   $node_arguments = array(
     array(
-      'class_name' => 'GSBFacultyD2DMigration',
+      'class_name' => 'GSBFacultyMigration',
       'description' => t('Migration of Faculty profile2 entities into Faculty CT nodes'),
-      'machine_name' => 'GSBFacultyD2D',
+      'machine_name' => 'GSBFaculty',
       'source_type' => 'faculty',
       'destination_type' => 'faculty',
       'default_uid' => 1,
@@ -49,4 +60,13 @@ function gsb_migrate_register_migrations() {
     Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
       $arguments);
   }
+}
+
+/**
+ * Helper callback to extract first value from an array.
+ * @param $values
+ * @return mixed
+ */
+function singlify($values) {
+  return reset($values);
 }

@@ -1,52 +1,6 @@
 <?php
 
 /**
- * GSBFacultyMigration class.
- *  - Faculty Profiles to Faculty CT migration.
- */
-class GSBFacultyMigration extends Migration {
-  public function __construct($arguments) {
-    parent::__construct($arguments);
-    $this->description = t('Migrate Faculty profile2 entity to Faculty CT node.');
-
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'pid' => array(
-          'type' => 'int',
-          'unsigned' => TRUE,
-          'not null' => TRUE,
-        )
-      ),
-      MigrateDestinationNode::getKeySchema()
-    );
-
-    $query = Database::getConnection('default', $arguments['source_connection'])
-      ->select('profile', 'p')
-      ->fields('p', array('pid','uid', 'created', 'changed'))
-      ->condition('p.type', 'faculty');
-
-    // Add tables and fields to your query to include all of your profile2 fields
-    $query->leftjoin('users', 'u', 'p.uid = u.uid');
-    $query->addField('u', 'name');
-    // @TODO: Join fields tables here.
-
-    $this->source = new MigrateSourceSQL($query);
-    $this->destination = new MigrateDestinationNode('faculty');
-
-    // Assign author.
-    $this->addFieldMapping('uid')
-      ->defaultValue(1);
-
-    // Map created and changed fields.
-    $this->addSimpleMappings(array('created', 'changed'));
-
-    $this->addFieldMapping('title')
-      ->defaultValue('Test title');
-    $this->addFieldMapping('field_first_name', 'name');
-  }
-}
-
-/**
  * Base class for all node migrations - handles commonalities across all
  * supported source Drupal versions.
  *
@@ -206,9 +160,14 @@ class DrupalProfile2NodeMigration extends DrupalMigration {
   }
 }
 
-class GSBFacultyD2DMigration extends DrupalProfile2NodeMigration {
+class GSBFacultyMigration extends DrupalProfile2NodeMigration {
   public function __construct(array $arguments) {
     parent::__construct($arguments);
+
+    $this->addFieldMapping('field_first_name', 'fc_field_name_over_ride_field_first_name:value')
+      ->callbacks('singlify');
+    $this->addFieldMapping('field_last_name', 'fc_field_name_over_ride_field_last_name:value')
+      ->callbacks('singlify');
   }
 
   protected function query() {
@@ -217,98 +176,18 @@ class GSBFacultyD2DMigration extends DrupalProfile2NodeMigration {
     $query->addField('u', 'name');
     return $query;
   }
-}
 
-class GSBDrupal extends DrupalVersion7 {
-
-  protected function populateSourceFieldInfo($entity_type, $bundle, $include_body = FALSE) {
-    parent::populateSourceFieldInfo($entity_type, $bundle, $include_body);
-
-    // Populate SourceFieldInfo with field collection fields.
-    $this->populateFieldCollectionSourceFieldInfo();
-  }
-
-  public function populateFieldCollectionSourceFieldInfo() {
-    foreach ($this->sourceFieldInfo as $field_name => $info) {
-      if ($info['type'] == 'field_collection') {
-        // Init array with field collection fields.
-        $this->sourceFieldInfo[$field_name]['field_collection_fields'] = array();
-        // Get each field attached to this type.
-        if (Database::getConnection('default', $this->arguments['source_connection'])
-          ->schema()->tableExists('field_config_instance')) {
-          $query = Database::getConnection('default', $this->arguments['source_connection'])
-            ->select('field_config_instance', 'i')
-            ->fields('i', array('data'))
-            ->condition('entity_type', 'field_collection_item')
-            ->condition('bundle', $field_name)
-            ->condition('i.deleted', 0);
-          $query->innerJoin('field_config', 'f', 'i.field_name = f.field_name');
-          $query->fields('f', array('field_name', 'type', 'module'));
-          $result = $query->execute();
-          foreach ($result as $row) {
-            $data = !empty($row->data) ? unserialize($row->data) : array();
-            // Although a format column is present for text fields with text
-            // filtering disabled, we want to skip it
-            if (substr($row->type, 0, 4) == 'text' &&
-              $data['settings']['text_processing'] == 0) {
-              $skip_format = TRUE;
-            }
-            else {
-              $skip_format = FALSE;
-            }
-            $columns = $this->getSourceFieldColumns($row->field_name, $skip_format);
-            foreach ($columns as $key => $column) {
-              $columns['fc_' . $field_name . '_' . $key] = $column;
-              unset($columns[$key]);
-            }
-            $this->sourceFieldInfo[$field_name]['field_collection_fields'][$row->field_name] = $columns;
-          }
-        }
+  public function complete($entity, stdClass $row) {
+    // Handle affiliations field.
+    if (!empty($row->field_affiliation)) {
+      foreach ($row->field_affiliation as $delta => $value) {
+        $field_collection = entity_create('field_collection_item', array('field_name' => 'field_affilitations'));
+        // Attach to the Node.
+        $field_collection->setHostEntity('node', $entity);
+        $field_collection->field_affiliations_position[LANGUAGE_NONE][0]['value'] = $row->{"fc_field_affiliation_field_affiliation_type:value"}[$delta][0];
+        // Save field-collection item.
+        $field_collection->save();
       }
     }
-  }
-
-  public function getSourceValues($row, $entity_id) {
-    parent::getSourceValues($row, $entity_id);
-    // Load up field data for dynamically mapped fields
-    foreach ($this->sourceFieldInfo as $field_name => $info) {
-      if ($info['type'] == 'field_collection') {
-        foreach ($this->sourceFieldInfo[$field_name]['field_collection_fields'] as $fc_field_name => $columns) {
-          // Find the data in field_data_$fc_field_name.
-          $table = "field_data_$fc_field_name";
-          $result = Database::getConnection('default', $this->arguments['source_connection'])
-            ->select($table, 'f')
-            ->fields('f')
-            ->condition('entity_type', 'field_collection')
-            ->condition('bundle', $field_name)
-            ->condition('entity_id', $entity_id)
-            ->orderBy('delta')
-            ->execute();
-          foreach ($result as $field_row) {
-            foreach ($columns as $display_name => $column_name) {
-              if (isset($row->$display_name) && !is_array($row->$display_name)) {
-                $row->$display_name = array($row->$display_name);
-              }
-              $row->{$display_name}[] = $field_row->$column_name;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  public function getSourceFields($entity_type, $bundle, $include_body = FALSE) {
-    $fields = parent::getSourceFields($entity_type, $bundle, $include_body);
-    foreach ($this->sourceFieldInfo as $field_name => $info) {
-      if ($info['type'] == 'field_collection') {
-        foreach ($info['field_collection_fields'] as $field_name => $columns) {
-          foreach ($columns as $display_name => $column_name) {
-            $fields[$display_name] = t('!label subfield', array('!label' => $info['label']));
-          }
-        }
-      }
-    }
-
-    return $fields;
   }
 }
