@@ -168,6 +168,11 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
       ->callbacks('singlify');
     $this->addFieldMapping('field_last_name', 'fc_field_name_over_ride_field_last_name:value')
       ->callbacks('singlify');
+    $this->addFieldMapping('field_middle_name', 'fc_field_name_over_ride_field_middle_name:value')
+      ->callbacks('singlify');
+
+    $this->addFieldMapping('field_title_position_unlimited', 'field_title_academic');
+    $this->addFieldMapping('field_rank', 'field_official_rank');
   }
 
   protected function query() {
@@ -175,6 +180,25 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $query->leftjoin('users', 'u', 'p.uid = u.uid');
     $query->addField('u', 'name');
     return $query;
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Prepare academic titles.
+    $academic_title_fields = array('field_title_academic', 'field_title_executive_education', 'field_title_other');
+    $acad_titles = array();
+    foreach ($academic_title_fields as $academic_title_field) {
+      if (isset($row->{$academic_title_field})) {
+        $row->{$academic_title_field} = trim(strip_tags($row->{$academic_title_field}[0]));
+        if (!empty($row->{$academic_title_field})) {
+          $acad_titles[] = $row->{$academic_title_field};
+        }
+      }
+    }
+    $row->field_title_academic = $acad_titles;
   }
 
   public function complete($entity, stdClass $row) {
