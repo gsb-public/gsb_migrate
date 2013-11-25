@@ -60,6 +60,33 @@ function gsb_migrate_register_migrations() {
     Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
       $arguments);
   }
+
+  // For vocabulary migrations, source_vocabulary and destination_vocabulary are
+  // required arguments. Note that in Drupal 6 vocabularies did not have machine
+  // names, so we use the vocabulary ID to uniquely identify them.
+  $vocabulary_arguments = array(
+    array(
+      'description' => t('Migration of Academic Area terms'),
+      'machine_name' => 'GSBTaxonomyAcademicArea',
+      'source_vocabulary' => 'academic_area',
+      'destination_vocabulary' => 'academic_area',
+      'class_name' => 'GSBTaxonomyAcademicAreaMigration',
+    ),
+  );
+
+  // Again, we're using the migrate_d2d class directly.
+  // The soft dependency says that while we don't have to run the user migration
+  // first, we want to make sure it's listed first so the vocubularies are
+  // listed right ahead of the node migrations.
+  $common_vocabulary_arguments = $common_arguments + array(
+    'class_name' => 'DrupalTerm7Migration',
+    'group_name' => 'taxonomy',
+  );
+  foreach ($vocabulary_arguments as $arguments) {
+    $arguments += $common_vocabulary_arguments;
+    Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
+      $arguments);
+  }
 }
 
 /**

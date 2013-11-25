@@ -162,29 +162,94 @@ class DrupalProfile2NodeMigration extends DrupalMigration {
 
 class GSBFacultyMigration extends DrupalProfile2NodeMigration {
   public function __construct(array $arguments) {
+    // Add some Person fields.
+    $this->sourceFields['field_person_first_name'] = 'Person: First name';
+    $this->sourceFields['field_person_middle_name'] = 'Person: Middle name';
+    $this->sourceFields['field_person_last_name'] = 'Person: Last name';
+    $this->sourceFields['field_person_sunetid'] = 'Person: Sunetid';
+    $this->sourceFields['field_person_personal_url'] = 'Person: Personal URL';
+    $this->sourceFields['field_person_work_phone'] = 'Person: Work Phone';
+    $this->sourceFields['field_person_email'] = 'Person: Email';
     parent::__construct($arguments);
 
-    $this->addFieldMapping('field_first_name', 'fc_field_name_over_ride_field_first_name:value')
-      ->callbacks('singlify');
-    $this->addFieldMapping('field_last_name', 'fc_field_name_over_ride_field_last_name:value')
-      ->callbacks('singlify');
-    $this->addFieldMapping('field_middle_name', 'fc_field_name_over_ride_field_middle_name:value')
-      ->callbacks('singlify');
+    // Personal info.
+    $this->addFieldMapping('field_first_name', 'field_person_first_name');
+    $this->addFieldMapping('field_middle_name', 'field_person_middle_name');
+    $this->addFieldMapping('field_last_name', 'field_person_last_name');
+    $this->addFieldMapping('field_sunetid', 'field_person_sunetid');
+    $this->addFieldMapping('field_link_website', 'field_person_personal_url');
+    $this->addFieldMapping('field_phone', 'field_person_work_phone');
+    $this->addFieldMapping('field_email', 'field_person_email');
 
     $this->addFieldMapping('field_title_position_unlimited', 'field_title_academic');
     $this->addFieldMapping('field_rank', 'field_official_rank');
+    $this->addFieldMapping('field_academic_area_single', 'field_academic_department')
+      ->sourceMigration('GSBTaxonomyAcademicArea');
+    $this->addFieldMapping('field_academic_area_single:source_type')
+      ->defaultValue('tid');
+    $this->addFieldMapping('field_academic_area_unlimited', 'field_other_academic_department')
+      ->sourceMigration('GSBTaxonomyAcademicArea');
+    $this->addFieldMapping('field_academic_area_unlimited:source_type')
+      ->defaultValue('tid');
+
+    $this->addFieldMapping('field_research_statement','field_teaching_research');
+    $this->addFieldMapping('field_body', 'field_bio');
   }
 
   protected function query() {
     $query = parent::query();
     $query->leftjoin('users', 'u', 'p.uid = u.uid');
     $query->addField('u', 'name');
+    $query->leftjoin('profile', 'personp', "personp.uid = u.uid AND personp.type = 'person'");
+
+    $query->leftjoin('field_data_field_sunetid', 'fsid', 'personp.pid = fsid.entity_id');
+    $query->addField('fsid', 'field_sunetid_value', 'field_person_sunetid');
+
+    $query->leftjoin('field_data_field_personal_url', 'fpu', 'personp.pid = fpu.entity_id');
+    $query->addField('fpu', 'field_personal_url_url', 'field_person_personal_url');
+
+    $query->leftjoin('field_data_field_work_phone', 'fwp', 'personp.pid = fwp.entity_id');
+    $query->addField('fwp', 'field_work_phone_value', 'field_person_work_phone');
+
+    $query->leftjoin('field_data_field_person_email', 'fpe', 'personp.pid = fpe.entity_id');
+    $query->addField('fpe', 'field_person_email_email', 'field_person_email');
+
+    $query->leftjoin('field_data_field_name_set', 'fns', 'personp.pid = fns.entity_id');
+    $query->leftjoin('field_data_field_person_first_name', 'fnsfn', 'fns.field_name_set_value = fnsfn.entity_id');
+    $query->addField('fnsfn', 'field_person_first_name_value', 'field_person_first_name');
+    $query->leftjoin('field_data_field_person_last_name', 'fnsln', 'fns.field_name_set_value = fnsln.entity_id');
+    $query->addField('fnsln', 'field_person_last_name_value', 'field_person_last_name');
+    $query->leftjoin('field_data_field_person_middle_name', 'fnsmn', 'fns.field_name_set_value = fnsmn.entity_id');
+    $query->addField('fnsmn', 'field_person_middle_name_value', 'field_person_middle_name');
+
     return $query;
   }
 
   public function prepareRow($row) {
     if (parent::prepareRow($row) === FALSE) {
       return FALSE;
+    }
+
+    // Replace person name when override is specified.
+    $name_override_field_mapping = array(
+      'field_person_first_name' => 'fc_field_name_over_ride_field_first_name:value',
+      'field_person_middle_name' => 'fc_field_name_over_ride_field_middle_name:value',
+      'field_person_last_name' => 'fc_field_name_over_ride_field_last_name:value',
+    );
+
+    foreach ($name_override_field_mapping as $name_original_field => $name_override_field) {
+      if (!empty($row->{$name_override_field}[0][0])) {
+        if ($row->{$name_override_field}[0][0] != $row->{$name_original_field}) {
+          watchdog($this->machineName, t('Fieldname !fieldname was replaced from !value1 to !value2 for !entity_id',
+            array(
+              '!fieldname' => $name_original_field,
+              '!value1' => $row->{$name_original_field},
+              '!value2' => $row->{$name_override_field}[0][0],
+              '!entity_id' => $row->pid,
+            )));
+          $row->{$name_original_field} = $row->{$name_override_field}[0][0];
+        }
+      }
     }
 
     // Prepare academic titles.
