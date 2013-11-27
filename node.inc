@@ -170,6 +170,8 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $this->sourceFields['field_person_personal_url'] = 'Person: Personal URL';
     $this->sourceFields['field_person_work_phone'] = 'Person: Work Phone';
     $this->sourceFields['field_person_email'] = 'Person: Email';
+    $this->sourceFields['field_cv_upload_url'] = 'Faculty: CV Upload URL';
+    $this->sourceFields['field_awards_honors_concat'] = 'Faculty: Concatenated awards and honors.';
     parent::__construct($arguments);
 
     // Personal info.
@@ -194,6 +196,20 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
 
     $this->addFieldMapping('field_research_statement','field_teaching_research');
     $this->addFieldMapping('field_body', 'field_bio');
+    $this->addFieldMapping('field_body:format')
+      ->defaultValue('gsb_wysiwyg_text');
+
+    // field_cv_upload_url field is prepared in prepareRow().
+    $this->addFieldMapping('field_file_single_public', 'field_cv_upload_url');
+    $this->addFieldMapping('field_file_single_public:destination_dir')
+      ->defaultValue('public://cv');
+//    $this->addFieldMapping('field_file_single_public:file_replace')
+//      ->defaultValue(MigrateFile::FILE_EXISTS_REUSE);
+//    $this->addFieldMapping('field_file_single_public:preserve_files')
+//      ->defaultValue(TRUE);
+
+    // Our own Awards and Honors field.
+    $this->addFieldMapping('field_awards_honors', 'field_awards_honors_concat');
   }
 
   protected function query() {
@@ -264,6 +280,37 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
       }
     }
     $row->field_title_academic = $acad_titles;
+
+    // Handle CV external and CV Upload fields.
+    if (!empty($row->field_cv_upload[0])) {
+      $cv_file_uri = Database::getConnection('default', $this->sourceConnection)
+        ->select('file_managed', 'f')
+        ->condition('fid', $row->field_cv_upload[0])
+        ->fields('f', array('uri'))
+        ->execute()
+        ->fetchField();
+      if ($cv_file_uri) {
+        $cv_file_uri = str_replace('public://', 'http://gsb.stanford.edu/sites/default/files/', $cv_file_uri);
+        $row->field_cv_upload_url = $cv_file_uri;
+      }
+    }
+    // Use external PDF link in case a local file is not available.
+    if (empty($cv_file_uri)) {
+      $row->field_cv_upload_url = $row->field_cv_external;
+    }
+
+    // Concatenate awards and honors.
+    $row->field_awards_honors_concat = array();
+    if (!empty($row->{"fc_field_awards_honors_field_award_name:value"})) {
+      foreach ($row->{"fc_field_awards_honors_field_award_name:value"} as $delta => $award_name)  {
+        $award_output = array(
+          $row->{"fc_field_awards_honors_field_award_name:value"}[$delta][0],
+          $row->{"fc_field_awards_honors_field_award_date:value"}[$delta][0],
+          $row->{"fc_field_awards_honors_field_awards_organization:value"}[$delta][0],
+        );
+        $row->field_awards_honors_concat[] = implode(', ', $award_output);
+      }
+    }
   }
 
   public function complete($entity, stdClass $row) {
