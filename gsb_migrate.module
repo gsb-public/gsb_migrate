@@ -17,6 +17,21 @@ function gsb_migrate_migrate_api() {
 }
 
 /**
+ * Implements hook_menu().
+ */
+function gsb_migrate_menu() {
+  $items['admin/config/gsb/gsb_migrate'] = array(
+    'title' => 'GSB Migration configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gsb_migrate_config_form'),
+    'file' => 'gsb_migrate.admin.inc',
+    'access arguments' => array(MIGRATE_ACCESS_ADVANCED),
+  );
+
+  return $items;
+}
+
+/**
  * Implements hook_flush_caches().
  */
 function gsb_migrate_flush_caches() {
@@ -27,6 +42,14 @@ function gsb_migrate_flush_caches() {
  * Register all migrations.
  */
 function gsb_migrate_register_migrations() {
+
+  // Get database connection.
+  $source_database = variable_get('gsb_migrate_database_connection', array());
+  if (empty($source_database)) {
+    watchdog('gsb_migrate', 'No database connection set. Go to admin/config/gsb/gsb_migrate and setup a database connection.');
+    return;
+  }
+
   /**
    * Each migration being registered takes an array of arguments, some required
    * and some optional. Start with the common arguments required by all - the
@@ -36,6 +59,7 @@ function gsb_migrate_register_migrations() {
    */
   $common_arguments = array(
     'source_connection' => 'gsb_legacy',
+    'source_database' => $source_database,
     'source_version' => 7,
     'group_name' => 'content',
     'version_class' => 'GSBDrupal',
