@@ -24,7 +24,8 @@ class GSBTaxonomyAcademicAreaMigration extends DrupalTerm7Migration {
       $row->name = $taxonomy_mapping[$row->name];
     }
 
-    $term = taxonomy_term_load_multiple(NULL, array('name' => $row->name, 'vocabulary_machine_name' => $this->arguments['academic_area']));
+    $vocabulary = taxonomy_vocabulary_machine_name_load($this->arguments['destination_vocabulary']);
+    $term = taxonomy_term_load_multiple(NULL, array('name' => $row->name, 'vid' => $vocabulary->vid));
 
     // Migrate only terms that already exist. This is needed for map table to be generated.
     if (!$term) {
