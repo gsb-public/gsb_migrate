@@ -30,11 +30,9 @@ function gsb_migrate_config_form() {
  * @param $form_state
  */
 function gsb_migrate_config_form_validate($form, &$form_state) {
-  dpm($form_state);
   $database = $form_state['values'][$form_state['values']['driver']];
   $database['driver'] = $form_state['values']['driver'];
   $form_state['storage']['database'] = $database;
-  dpm($database);
 
   // Make sure we can connect
   try {
