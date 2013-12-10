@@ -160,7 +160,11 @@ class DrupalProfile2NodeMigration extends DrupalMigration {
   }
 }
 
-class GSBFacultyMigration extends DrupalProfile2NodeMigration {
+/**
+ * Class GSBFacultyBaseMigration
+ *  - GSBFacultyBaseMigration class to be extended for Insert and Update migrations.
+ */
+class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
   public function __construct(array $arguments) {
     // Add some Person fields.
     $this->sourceFields['field_person_first_name'] = 'Person: First name';
@@ -170,9 +174,16 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $this->sourceFields['field_person_personal_url'] = 'Person: Personal URL';
     $this->sourceFields['field_person_work_phone'] = 'Person: Work Phone';
     $this->sourceFields['field_person_email'] = 'Person: Email';
+    $this->sourceFields['field_person_hide_work_phone'] = 'Person: Hide Work Phone';
+    $this->sourceFields['field_person_hide_email'] = 'Person: Hide Email';
+
+    // Add Faculty prepared fields.
     $this->sourceFields['field_cv_upload_url'] = 'Faculty: CV Upload URL';
     $this->sourceFields['field_awards_honors_concat'] = 'Faculty: Concatenated awards and honors.';
     parent::__construct($arguments);
+
+    // We use Academic Areas here. So we need the terms migrated first.
+    $this->dependencies[] = 'GSBTaxonomyAcademicArea';
 
     // Personal info.
     $this->addFieldMapping('field_first_name', 'field_person_first_name');
@@ -183,7 +194,8 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $this->addFieldMapping('field_phone', 'field_person_work_phone');
     $this->addFieldMapping('field_email', 'field_person_email');
 
-    $this->addFieldMapping('field_title_position_unlimited', 'field_title_academic');
+    $this->addFieldMapping('field_title_position_unlimited', 'field_title_academic')
+      ->callbacks('array_decode_entities');
     $this->addFieldMapping('field_rank', 'field_official_rank');
     $this->addFieldMapping('field_academic_area_single', 'field_academic_department')
       ->sourceMigration('GSBTaxonomyAcademicArea');
@@ -194,7 +206,8 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $this->addFieldMapping('field_academic_area_unlimited:source_type')
       ->defaultValue('tid');
 
-    $this->addFieldMapping('field_research_statement','field_teaching_research');
+    $this->addFieldMapping('field_research_statement','field_teaching_research')
+      ->callbacks('array_strip_tags');
     $this->addFieldMapping('field_body', 'field_bio');
     $this->addFieldMapping('field_body:format')
       ->defaultValue('gsb_wysiwyg_text');
@@ -203,13 +216,10 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $this->addFieldMapping('field_file_single_public', 'field_cv_upload_url');
     $this->addFieldMapping('field_file_single_public:destination_dir')
       ->defaultValue('public://cv');
-//    $this->addFieldMapping('field_file_single_public:file_replace')
-//      ->defaultValue(MigrateFile::FILE_EXISTS_REUSE);
-//    $this->addFieldMapping('field_file_single_public:preserve_files')
-//      ->defaultValue(TRUE);
 
     // Our own Awards and Honors field.
-    $this->addFieldMapping('field_awards_honors', 'field_awards_honors_concat');
+    $this->addFieldMapping('field_awards_honors', 'field_awards_honors_concat')
+      ->callbacks('array_strip_tags');
   }
 
   protected function query() {
@@ -227,8 +237,14 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $query->leftjoin('field_data_field_work_phone', 'fwp', 'personp.pid = fwp.entity_id');
     $query->addField('fwp', 'field_work_phone_value', 'field_person_work_phone');
 
+    $query->leftjoin('field_data_field_hide_phone', 'fhp', 'personp.pid = fhp.entity_id');
+    $query->addField('fhp', 'field_hide_phone_value', 'field_person_hide_work_phone');
+
     $query->leftjoin('field_data_field_person_email', 'fpe', 'personp.pid = fpe.entity_id');
     $query->addField('fpe', 'field_person_email_email', 'field_person_email');
+
+    $query->leftjoin('field_data_field_hide_email', 'fhe', 'personp.pid = fhe.entity_id');
+    $query->addField('fhe', 'field_hide_email_value', 'field_person_hide_email');
 
     $query->leftjoin('field_data_field_name_set', 'fns', 'personp.pid = fns.entity_id');
     $query->leftjoin('field_data_field_person_first_name', 'fnsfn', 'fns.field_name_set_value = fnsfn.entity_id');
@@ -246,12 +262,28 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
       return FALSE;
     }
 
+    // Skip profile2 entities that don't have sunetid.
+    if (empty($row->field_person_sunetid)) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->pid . "\n";
+
     // Replace person name when override is specified.
     $name_override_field_mapping = array(
       'field_person_first_name' => 'fc_field_name_over_ride_field_first_name:value',
       'field_person_middle_name' => 'fc_field_name_over_ride_field_middle_name:value',
       'field_person_last_name' => 'fc_field_name_over_ride_field_last_name:value',
     );
+
+    // Don't migrate email and phone if those were hidden in legacy site.
+    if ($row->field_person_hide_email) {
+      unset($row->field_person_email);
+    }
+    if ($row->field_person_hide_work_phone) {
+      unset($row->field_person_work_phone);
+    }
 
     foreach ($name_override_field_mapping as $name_original_field => $name_override_field) {
       if (!empty($row->{$name_override_field}[0][0])) {
@@ -282,21 +314,29 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     $row->field_title_academic = $acad_titles;
 
     // Handle CV external and CV Upload fields.
-    if (!empty($row->field_cv_upload[0])) {
+    if (!empty($row->field_cv_upload)) {
       $cv_file_uri = Database::getConnection('default', $this->sourceConnection)
         ->select('file_managed', 'f')
         ->condition('fid', $row->field_cv_upload[0])
         ->fields('f', array('uri'))
         ->execute()
         ->fetchField();
-      if ($cv_file_uri) {
-        $cv_file_uri = str_replace('public://', 'http://gsb.stanford.edu/sites/default/files/', $cv_file_uri);
+    }
+
+    if ($cv_file_uri) {
+      $cv_file_uri = str_replace('public://', 'http://gsb.stanford.edu/sites/default/files/', $cv_file_uri);
+    }
+    else {
+      // Use external PDF link in case a local file is not available.
+      $cv_file_uri = $row->field_cv_external[0];
+    }
+
+    if (!empty($cv_file_uri)) {
+      $cv_ext = pathinfo($cv_file_uri, PATHINFO_EXTENSION);
+      // Import only PDF CVs.
+      if (!empty($cv_ext) && strtolower($cv_ext) == 'pdf') {
         $row->field_cv_upload_url = $cv_file_uri;
       }
-    }
-    // Use external PDF link in case a local file is not available.
-    if (empty($cv_file_uri)) {
-      $row->field_cv_upload_url = $row->field_cv_external;
     }
 
     // Concatenate awards and honors.
@@ -313,17 +353,83 @@ class GSBFacultyMigration extends DrupalProfile2NodeMigration {
     }
   }
 
-  public function complete($entity, stdClass $row) {
-    // Handle affiliations field.
-    if (!empty($row->field_affiliation)) {
-      foreach ($row->field_affiliation as $delta => $value) {
-        $field_collection = entity_create('field_collection_item', array('field_name' => 'field_affilitations'));
-        // Attach to the Node.
-        $field_collection->setHostEntity('node', $entity);
-        $field_collection->field_affiliations_position[LANGUAGE_NONE][0]['value'] = $row->{"fc_field_affiliation_field_affiliation_type:value"}[$delta][0];
-        // Save field-collection item.
-        $field_collection->save();
+  /**
+   * Fetch existing Faculty nid by sunetid.
+   * @param $sunetid
+   * @return $destination_id
+   */
+  public function getFacultyNidBySunetid($sunetid) {
+    $destination_id = db_select('field_data_field_sunetid', 'fs')
+      ->condition('field_sunetid_value', $sunetid)
+      ->condition('bundle', 'faculty')
+      ->fields('fs', array('entity_id'))
+      ->execute()
+      ->fetchField();
+
+    return $destination_id;
+  }
+}
+
+/**
+ * Class GSBFacultyUpdateMigration
+ *  - Update manually created Faculty nodes.
+ */
+class GSBFacultyUpdateMigration extends GSBFacultyBaseMigration {
+  public function __construct(array $arguments) {
+    $this->sourceFields['destination_id'] = 'Destination ID to be used to merge nodes.';
+    parent::__construct($arguments);
+
+    // Specify destination as update source.
+    $this->systemOfRecord = Migration::DESTINATION;
+    $this->addFieldMapping('nid', 'destination_id');
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // Try to map existing content by sunetid.
+    if (!empty($row->field_person_sunetid)) {
+      $destination_id = $this->getFacultyNidBySunetid($row->field_person_sunetid);
+      if ($destination_id) {
+        $row->destination_id = $destination_id;
+        return TRUE;
       }
     }
+
+    return FALSE;
+  }
+}
+
+/**
+ * Class GSBFacultyInsertMigration
+ *  - Migrate (insert) Faculty nodes that don't yet exist.
+ *  We check sunetid to verify if that's an existing node.
+ */
+class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // Let's update existing nodes first.
+    $this->dependencies[] = 'GSBFacultyUpdate';
+
+    // Set all newly migrated Faculty profiles to published.
+    $this->addFieldMapping('status')
+      ->defaultValue(TRUE);
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (!empty($row->field_person_sunetid)) {
+      $destination_id = $this->getFacultyNidBySunetid($row->field_person_sunetid);
+      if (!$destination_id) {
+        return TRUE;
+      }
+    }
+
+    return FALSE;
   }
 }

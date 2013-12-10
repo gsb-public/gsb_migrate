@@ -70,9 +70,17 @@ function gsb_migrate_register_migrations() {
   // and destination_type are required arguments.
   $node_arguments = array(
     array(
-      'class_name' => 'GSBFacultyMigration',
+      'class_name' => 'GSBFacultyInsertMigration',
       'description' => t('Migration of Faculty profile2 entities into Faculty CT nodes'),
-      'machine_name' => 'GSBFaculty',
+      'machine_name' => 'GSBFacultyInsert',
+      'source_type' => 'faculty',
+      'destination_type' => 'faculty',
+      'default_uid' => 1,
+    ),
+    array(
+      'class_name' => 'GSBFacultyUpdateMigration',
+      'description' => t('Update manually created Faculty nodes.'),
+      'machine_name' => 'GSBFacultyUpdate',
       'source_type' => 'faculty',
       'destination_type' => 'faculty',
       'default_uid' => 1,
@@ -104,7 +112,6 @@ function gsb_migrate_register_migrations() {
   // listed right ahead of the node migrations.
   $common_vocabulary_arguments = $common_arguments + array(
     'class_name' => 'DrupalTerm7Migration',
-    'group_name' => 'taxonomy',
   );
   foreach ($vocabulary_arguments as $arguments) {
     $arguments += $common_vocabulary_arguments;
@@ -120,4 +127,42 @@ function gsb_migrate_register_migrations() {
  */
 function singlify($values) {
   return reset($values);
+}
+
+/**
+ * Helper function to decode entities in array.
+ *
+ * @param array $array
+ * @return array
+ *   Processed array.
+ */
+function array_decode_entities($array) {
+  if (is_array($array)) {
+    foreach ($array as &$value) {
+      if (is_string($value)) {
+        $value = decode_entities($value);
+      }
+    }
+  }
+
+  return $array;
+}
+
+/**
+ * Helper function to strip tags in array values.
+ *
+ * @param array $array
+ * @return array
+ *   Processed array.
+ */
+function array_strip_tags($array) {
+  if (is_array($array)) {
+    foreach ($array as &$value) {
+      if (is_string($value)) {
+        $value = strip_tags($value);
+      }
+    }
+  }
+
+  return $array;
 }

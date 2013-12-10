@@ -6,6 +6,7 @@
  *  - Pull source field_collection entities' fields.
  */
 class GSBDrupal extends DrupalVersion7 {
+
   /**
    * Override populateSourceFieldInfo,
    */
