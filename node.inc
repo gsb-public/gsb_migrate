@@ -324,7 +324,7 @@ class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
     }
 
     if ($cv_file_uri) {
-      $cv_file_uri = str_replace('public://', 'http://gsb.stanford.edu/sites/default/files/', $cv_file_uri);
+      $cv_file_uri = str_replace('public://', 'http://www.gsb.stanford.edu/sites/default/files/', $cv_file_uri);
     }
     else {
       // Use external PDF link in case a local file is not available.
