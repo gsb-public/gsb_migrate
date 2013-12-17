@@ -313,6 +313,7 @@ class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
     }
     $row->field_title_academic = $acad_titles;
 
+    watchdog('gsb_migrate_cv_debug', "Start handling CV field for %pid", array('%pid' => $row->pid));
     // Handle CV external and CV Upload fields.
     if (!empty($row->field_cv_upload)) {
       $cv_file_uri = Database::getConnection('default', $this->sourceConnection)
@@ -324,11 +325,14 @@ class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
     }
 
     if ($cv_file_uri) {
+      watchdog('gsb_migrate_cv_debug', "CV Upload field has value: %cv_uri.", array('%cv_uri' => $cv_file_uri));
       $cv_file_uri = str_replace('public://', 'http://www.gsb.stanford.edu/sites/default/files/', $cv_file_uri);
+      watchdog('gsb_migrate_cv_debug', "CV Upload field URL is modified to: %cv_uri.", array('%cv_uri' => $cv_file_uri));
     }
     else {
       // Use external PDF link in case a local file is not available.
       $cv_file_uri = $row->field_cv_external[0];
+      watchdog('gsb_migrate_cv_debug', "CV External field is used with value: %cv_uri.", array('%cv_uri' => $cv_file_uri));
     }
 
     if (!empty($cv_file_uri)) {
@@ -336,6 +340,7 @@ class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
       // Import only PDF CVs.
       if (!empty($cv_ext) && strtolower($cv_ext) == 'pdf') {
         $row->field_cv_upload_url = $cv_file_uri;
+        watchdog('gsb_migrate_cv_debug', "CV final mapped value is: %cv_uri.", array('%cv_uri' => $cv_file_uri));
       }
     }
 
