@@ -4,9 +4,7 @@ package = GSB
 core = 7.x
 
 dependencies[] = migrate
-dependencies[] = migrate_d2d
 dependencies[] = migrate_ui
-dependencies[] = migrate_d2d_ui
 
 files[] = base.inc
 files[] = node.inc

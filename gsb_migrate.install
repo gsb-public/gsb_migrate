@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function gsb_migrate_install() {
+  /**
+   *  Enable migrate_d2d from hook_install because of a bug in hook_requirements in migrate_d2d.
+   *  @see https://drupal.org/node/2014619
+   */
+  module_enable(array('migrate_d2d', 'migrate_d2d_ui'));
+  $admin_role = user_role_load_by_name('administrator');
+  // Grant all migrate permissions for admin role.
+  user_role_grant_permissions($admin_role->rid, array_keys(module_invoke('migrate', 'permission')));
+}
