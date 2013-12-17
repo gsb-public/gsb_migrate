@@ -304,10 +304,14 @@ class GSBFacultyBaseMigration extends DrupalProfile2NodeMigration {
     $academic_title_fields = array('field_title_academic', 'field_title_executive_education', 'field_title_other');
     $acad_titles = array();
     foreach ($academic_title_fields as $academic_title_field) {
-      if (isset($row->{$academic_title_field})) {
-        $row->{$academic_title_field} = trim(strip_tags($row->{$academic_title_field}[0]));
-        if (!empty($row->{$academic_title_field})) {
-          $acad_titles[] = $row->{$academic_title_field};
+      if (isset($row->{$academic_title_field}[0])) {
+        // Handle multiple lines as separate titles.
+        $title_rows = explode("\n", $row->{$academic_title_field}[0]);
+        foreach ($title_rows as $title_row) {
+          $title_row = trim(strip_tags($title_row));
+          if (!empty($title_row)) {
+            $acad_titles[] = $title_row;
+          }
         }
       }
     }
