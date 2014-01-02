@@ -85,6 +85,14 @@ function gsb_migrate_register_migrations() {
       'destination_type' => 'faculty',
       'default_uid' => 1,
     ),
+    array(
+      'class_name' => 'GSBBookMigration',
+      'description' => t('Migrate Publications with Book type.'),
+      'machine_name' => 'GSBBook',
+      'source_type' => 'publication',
+      'destination_type' => 'book',
+      'default_uid' => 1,
+    ),
   );
 
   foreach ($node_arguments as $arguments) {

@@ -442,3 +442,36 @@ class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
     return FALSE;
   }
 }
+
+/**
+ * Class GSBBookMigration
+ *  - Migrate class for Book CT migration.
+ *    Book is considered legacy 'publication' content type with field_publication_type == BOOK.
+ */
+class GSBBookMigration extends DrupalNode7Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    $this->addFieldMapping('field_year_of_publication', 'field_year_published');
+    $this->addFieldMapping('field_link_unlimited', 'field_publication_url');
+    $this->addSimpleMappings(array('field_publisher'));
+  }
+
+  public function query() {
+    $query = parent::query();
+    $query->leftjoin('field_data_field_publication_type', 'fpt', 'n.nid = fpt.entity_id');
+    $query->condition('fpt.field_publication_type_value','BOOK');
+
+    return $query;
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (!empty($row->field_year_published[0])) {
+      $row->field_year_published = strtotime($row->field_year_published[0]);
+    }
+  }
+}
