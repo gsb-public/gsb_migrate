@@ -450,11 +450,23 @@ class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
  */
 class GSBBookMigration extends DrupalNode7Migration {
   public function __construct(array $arguments) {
+    $this->sourceFields['authors_pids'] = 'Authors PIDs';
+
     parent::__construct($arguments);
 
     $this->addFieldMapping('field_year_of_publication', 'field_year_published');
     $this->addFieldMapping('field_link_unlimited', 'field_publication_url');
+
+    // Override title mapped in parent class.
+    $this->removeFieldMapping('title');
+    $this->addFieldMapping('title', 'title')
+      ->callbacks('strip_tags');
+    $this->addFieldMapping('field_description', 'body');
+    $this->addFieldMapping('field_description:format')
+      ->defaultValue('gsb_wysiwyg_text');
+
     $this->addSimpleMappings(array('field_publisher'));
+
   }
 
   public function query() {
@@ -471,7 +483,52 @@ class GSBBookMigration extends DrupalNode7Migration {
     }
 
     if (!empty($row->field_year_published[0])) {
-      $row->field_year_published = strtotime($row->field_year_published[0]);
+      // Convert year to a format that date module can digest.
+      $converted_date = DateTime::createFromFormat('Y', $row->field_year_published[0])->format('Y-m-d H:i:s');
+      $row->field_year_published[0] = $converted_date;
     }
+
+    // Get author ids from legacy faculty profiles.
+    $row->authors_pids = $this->getAuthors($row->nid);
+  }
+
+  public function complete($entity, stdClass $row) {
+    // Handle affiliations field.
+    if (!empty($row->authors_pids)) {
+      foreach ($row->authors_pids as $delta => $value) {
+        $destination_nid = $this->handleSourceMigration(array('GSBFacultyInsert', 'GSBFacultyUpdate'), $value);
+        if ($destination_nid) {
+          $field_collection = entity_create('field_collection_item', array('field_name' => 'field_person_fac_other'));
+          // Attach to the Node.
+          $field_collection->setHostEntity('node', $entity);
+          $field_collection->field_person_fac_or_other[LANGUAGE_NONE][0]['value'] = 'UseEntityReference';
+          $field_collection->field_person_fac_single_ref[LANGUAGE_NONE][0]['target_id'] = $destination_nid;
+
+          // Save field-collection item.
+          $field_collection->save();
+        }
+      }
+    }
+  }
+
+  /**
+   * Get book authors.
+   *   - Book authors are faculty profiles referencing publications.
+   *
+   * @param int $nid
+   * @return array $pids
+   *   Array of legacy faculty profile pids.
+   */
+  public function getAuthors($nid) {
+    $query = Database::getConnection('default', $this->sourceConnection)->select('node', 'n');
+    $query->join('field_data_field_publication_name', 'fpn', 'fpn.field_publication_name_target_id = n.nid');
+    $query->join('field_data_field_publication', 'fp', 'fp.field_publication_value = fpn.entity_id');
+    $query->condition('n.nid', $nid);
+    $query->fields('fp', array('entity_id'));
+    $results = $query->execute()->fetchAllAssoc('entity_id');
+
+    $pids = array_keys($results);
+
+    return $pids;
   }
 }
