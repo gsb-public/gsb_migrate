@@ -442,3 +442,49 @@ class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
     return FALSE;
   }
 }
+
+/**
+ * Class GSBInTheNewsMigration
+ *  - Migrate class for In The News CT migration.
+ */
+class GSBInTheNewsMigration extends DrupalNode7Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    $this->addFieldMapping('field_date_single', 'field_date');
+    $this->addFieldMapping('field_link_single', 'field_url');
+    $this->addFieldMapping('field_editorial_summary', 'field_teaser');
+    $this->addFieldMapping('field_image_single_public', 'field_newsmakers_image');
+    $this->addFieldMapping('field_image_single_public:destination_dir')
+      ->defaultValue('public://in-the-news');
+
+//    $this->addFieldMapping('field_tag', 'field_term_tag');
+//    $this->addFieldMapping('field_tag:source_type')
+//      ->defaultValue('tid');
+//    $this->addFieldMapping('field_region', 'field_news_term_region');
+//    $this->addFieldMapping('field_region:source_type')
+//      ->defaultValue('tid');
+
+    $this->addSimpleMappings(array('field_source_publication'));
+    $this->removeFieldMapping('pathauto');
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (!empty($row->field_newsmakers_image)) {
+      $file_uri = Database::getConnection('default', $this->sourceConnection)
+        ->select('file_managed', 'f')
+        ->condition('fid', $row->field_newsmakers_image[0])
+        ->fields('f', array('uri'))
+        ->execute()
+        ->fetchField();
+      if ($file_uri) {
+        $file_uri = str_replace('public://', 'http://www.gsb.stanford.edu/sites/default/files/', $file_uri);
+        $row->field_newsmakers_image = $file_uri;
+      }
+    }
+  }
+}

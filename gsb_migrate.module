@@ -85,6 +85,14 @@ function gsb_migrate_register_migrations() {
       'destination_type' => 'faculty',
       'default_uid' => 1,
     ),
+    array(
+      'class_name' => 'GSBInTheNewsMigration',
+      'description' => t('Migrate In The News.'),
+      'machine_name' => 'GSBInTheNews',
+      'source_type' => 'newsmakers',
+      'destination_type' => 'in_the_news',
+      'default_uid' => 1,
+    ),
   );
 
   foreach ($node_arguments as $arguments) {
