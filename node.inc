@@ -450,6 +450,8 @@ class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
  */
 class GSBBookMigration extends DrupalNode7Migration {
   public function __construct(array $arguments) {
+    // We use faculty profiles as author references, so those need to go first.
+    $this->dependencies = array('GSBFacultyInsert', 'GSBFacultyUpdate');
     $this->sourceFields['authors_pids'] = 'Authors PIDs';
 
     parent::__construct($arguments);
@@ -498,7 +500,7 @@ class GSBBookMigration extends DrupalNode7Migration {
       foreach ($row->authors_pids as $delta => $value) {
         $destination_nid = $this->handleSourceMigration(array('GSBFacultyInsert', 'GSBFacultyUpdate'), $value);
         if ($destination_nid) {
-          $field_collection = entity_create('field_collection_item', array('field_name' => 'field_person_fac_other'));
+          $field_collection = entity_create('field_collection_item', array('field_name' => 'field_authors'));
           // Attach to the Node.
           $field_collection->setHostEntity('node', $entity);
           $field_collection->field_person_fac_or_other[LANGUAGE_NONE][0]['value'] = 'UseEntityReference';
