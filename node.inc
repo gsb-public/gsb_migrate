@@ -450,10 +450,6 @@ class GSBFacultyInsertMigration extends GSBFacultyBaseMigration {
  */
 class GSBBookMigration extends DrupalNode7Migration {
   public function __construct(array $arguments) {
-    // We use faculty profiles as author references, so those need to go first.
-    $this->dependencies = array('GSBFacultyInsert', 'GSBFacultyUpdate');
-    $this->sourceFields['authors_pids'] = 'Authors PIDs';
-
     parent::__construct($arguments);
 
     $this->addFieldMapping('field_year_of_publication', 'field_year_published');
@@ -484,53 +480,89 @@ class GSBBookMigration extends DrupalNode7Migration {
       return FALSE;
     }
 
+    // Left here for debugging.
+    print $row->nid . "\n";
+
     if (!empty($row->field_year_published[0])) {
       // Convert year to a format that date module can digest.
       $converted_date = DateTime::createFromFormat('Y', $row->field_year_published[0])->format('Y-m-d H:i:s');
       $row->field_year_published[0] = $converted_date;
     }
+  }
+}
 
-    // Get author ids from legacy faculty profiles.
-    $row->authors_pids = $this->getAuthors($row->nid);
+/**
+ * Class GSBBookAuthorsMigration
+ *  - Migrate Book authors in field collection field.
+ */
+class GSBBookAuthorsMigration extends DrupalMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBBook', 'GSBFacultyInsert', 'GSBFacultyUpdate');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceSQL($this->query(), $this->sourceFields, NULL,
+      $this->sourceOptions);
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => true,
+        ),
+        'profile_pid' => array(
+          'type' => 'int',
+          'not null' => true,
+        ),
+      ),
+      MigrateDestinationFieldCollection::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFieldCollection(
+      'field_authors',
+      array('host_entity_type' => 'node')
+    );
+
+    $this->addFieldMapping('host_entity_id', 'nid')
+      ->sourceMigration('GSBBook');
+
+    $this->addFieldMapping('field_person_fac_or_other')
+      ->defaultValue('UseEntityReference');
+    $this->addFieldMapping('field_person_fac_single_ref', 'profile_pid')
+      ->sourceMigration(array('GSBFacultyInsert', 'GSBFacultyUpdate'));
   }
 
-  public function complete($entity, stdClass $row) {
-    // Handle affiliations field.
-    if (!empty($row->authors_pids)) {
-      foreach ($row->authors_pids as $delta => $value) {
-        $destination_nid = $this->handleSourceMigration(array('GSBFacultyInsert', 'GSBFacultyUpdate'), $value);
-        if ($destination_nid) {
-          $field_collection = entity_create('field_collection_item', array('field_name' => 'field_authors'));
-          // Attach to the Node.
-          $field_collection->setHostEntity('node', $entity);
-          $field_collection->field_person_fac_or_other[LANGUAGE_NONE][0]['value'] = 'UseEntityReference';
-          $field_collection->field_person_fac_single_ref[LANGUAGE_NONE][0]['target_id'] = $destination_nid;
-
-          // Save field-collection item.
-          $field_collection->save();
-        }
-      }
-    }
-  }
-
-  /**
-   * Get book authors.
-   *   - Book authors are faculty profiles referencing publications.
-   *
-   * @param int $nid
-   * @return array $pids
-   *   Array of legacy faculty profile pids.
-   */
-  public function getAuthors($nid) {
-    $query = Database::getConnection('default', $this->sourceConnection)->select('node', 'n');
+  function query() {
+    $query = Database::getConnection('default', $this->sourceConnection)
+      ->select('node', 'n');
+    $query->join('field_data_field_publication_type', 'fpt', 'n.nid = fpt.entity_id');
     $query->join('field_data_field_publication_name', 'fpn', 'fpn.field_publication_name_target_id = n.nid');
     $query->join('field_data_field_publication', 'fp', 'fp.field_publication_value = fpn.entity_id');
-    $query->condition('n.nid', $nid);
-    $query->fields('fp', array('entity_id'));
-    $results = $query->execute()->fetchAllAssoc('entity_id');
+    $query->addField('fp', 'entity_id', 'profile_pid');
+    $query->fields('n', array('nid'))
+      ->condition('fpt.field_publication_type_value','BOOK')
+      ->condition('type', 'publication')
+      ->orderBy('nid')
+      ->orderBy('fp.entity_id');
 
-    $pids = array_keys($results);
+    return $query;
+  }
 
-    return $pids;
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->nid . "\n";
+
+    // Migrate only if faculty author was migrated and is available.
+    $destination_nid = $this->handleSourceMigration(array('GSBFacultyInsert', 'GSBFacultyUpdate'), $row->profile_pid);
+    if (empty($destination_nid)) {
+      $this->queueMessage(t('Faculty author with legacy pid %profile_pid is not available. Skipped.',
+        array('%profile_pid' => $row->profile_pid)));
+      return FALSE;
+    }
+
+    return TRUE;
   }
 }

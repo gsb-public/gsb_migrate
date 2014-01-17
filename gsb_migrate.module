@@ -126,6 +126,14 @@ function gsb_migrate_register_migrations() {
     Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
       $arguments);
   }
+
+  // Migrate Book Authors in field collection.
+  $book_authors = $common_arguments + array(
+    'class_name' => 'GSBBookAuthorsMigration',
+    'description' => t('Migrate Book CT field_authors field collection.'),
+    'machine_name' => 'GSBBookAuthors',
+  );
+  Migration::registerMigration($book_authors['class_name'], $book_authors['machine_name'], $book_authors);
 }
 
 /**
