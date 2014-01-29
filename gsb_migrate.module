@@ -42,6 +42,8 @@ function gsb_migrate_flush_caches() {
  * Register all migrations.
  */
 function gsb_migrate_register_migrations() {
+  // Data directory with CSV sources.
+  $directory = drupal_get_path('module', 'gsb_migrate') . '/data/';
 
   // Get database connection.
   $source_database = variable_get('gsb_migrate_database_connection', array());
@@ -134,6 +136,20 @@ function gsb_migrate_register_migrations() {
     'machine_name' => 'GSBBookAuthors',
   );
   Migration::registerMigration($book_authors['class_name'], $book_authors['machine_name'], $book_authors);
+
+  $publication_ct = array(
+    'group_name' => 'content',
+    'source_file' => $directory . 'publication.csv',
+  );
+  Migration::registerMigration('GSBPublicationMigration', NULL, $publication_ct);
+
+  $publication_authors = $common_arguments + array(
+    'class_name' => 'GSBPublicationAuthorsMigration',
+    'description' => t('Migrate Publication CT field_authors field collection.'),
+    'machine_name' => 'GSBPublicationAuthors',
+    'source_file' => $directory . 'publication-authors.csv',
+  );
+  Migration::registerMigration($publication_authors['class_name'], $publication_authors['machine_name'], $publication_authors);
 }
 
 /**

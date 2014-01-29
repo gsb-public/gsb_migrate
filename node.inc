@@ -566,3 +566,254 @@ class GSBBookAuthorsMigration extends DrupalMigration {
     return TRUE;
   }
 }
+
+class GSBPublicationMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns(), array(), $this->fields());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => true,
+        ),
+      ),
+      MigrateDestinationNode::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationNode('publication');
+
+    $this->addSimpleMappings(array('title', 'created', 'status'));
+    $this->addFieldMapping('uid')
+      ->defaultValue(1);
+    //$this->addFieldMapping('field_authors', 'authors');
+    $this->addFieldMapping('field_publisher', 'publisher');
+    $this->addFieldMapping('field_place_of_publication', 'place_of_publication');
+    $this->addFieldMapping('field_description', 'abstract');
+    $this->addFieldMapping('field_pub_book_title', 'pub_book_title');
+    $this->addFieldMapping('field_pub_date_day', 'publication_day');
+    $this->addFieldMapping('field_pub_date_month', 'publication_month');
+    $this->addFieldMapping('field_year_of_publication', 'publication_year');
+    $this->addFieldMapping('field_volume_number', 'volume');
+    $this->addFieldMapping('field_issue_number', 'issue');
+    $this->addFieldMapping('field_page_count', 'pages');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[2]  = array('created', 'Created Date');
+    $columns[3]  = array('status', 'Status');
+    $columns[4]  = array('nid', 'Nid');
+    $columns[7]  = array('author_sunetid', 'Author SUNETID');
+    $columns[8]  = array('title', 'Title');
+    $columns[9]  = array('publisher', 'Publisher');
+    $columns[10] = array('link_to_source', 'Link to Source');
+    $columns[11] = array('publication_day', 'Publication Day');
+    $columns[12] = array('publication_month', 'Publication Month');
+    $columns[13] = array('publication_year', 'Publication Year');
+    $columns[15] = array('abstract', 'Abstract');
+    $columns[16] = array('pub_book_title', 'Source Publication / Book Title');
+    $columns[17] = array('place_of_publication', 'Place of Publication');
+    $columns[18] = array('volume', 'Volume #');
+    $columns[19] = array('issue', 'Issue #');
+    $columns[20] = array('pages', 'Pages #');
+    $columns[22] = array('author_first_name', 'Non GSB Author First Name');
+    $columns[23] = array('author_last_name', 'Non GSB Author Last Name');
+
+    return $columns;
+  }
+
+  protected function fields() {
+    $fields = array();
+
+    $fields['authors'] = 'Computed authors field prepared in prepareRow()';
+
+    return $fields;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->nid . "\n";
+
+    if (!empty($row->publication_year)) {
+      // Convert year to a format that date module can digest.
+      if ($converted_date = DateTime::createFromFormat('Y', $row->publication_year)) {
+        $row->publication_year = $converted_date->format('Y-m-d H:i:s');
+      }
+      else {
+        $this->queueMessage(t('Publication Year is not a valid year. Value: %value',
+          array('%value' => $row->publication_year)));
+        unset($row->publication_year);
+      }
+    }
+
+    if (!empty($row->publication_month) && !is_numeric($row->publication_month)) {
+      $this->queueMessage(t('Publication Month should be a valid integer. Value: %value',
+        array('%value' => $row->publication_month)));
+      unset($row->publication_month);
+    }
+
+    if (!empty($row->publication_day) && !is_numeric($row->publication_day)) {
+      $this->queueMessage(t('Publication Day should be a valid integer. Value: %value',
+        array('%value' => $row->publication_day)));
+      unset($row->publication_day);
+    }
+
+    return TRUE;
+  }
+
+  function complete($entity, stdClass $row) {
+    $filename = drupal_get_path('module', 'gsb_migrate') . '/data/publication-authors.csv';
+    $lines = array();
+    $line = array(
+      'nid' => $row->nid,
+      'author_sunetid' => '',
+      'author_first_name' => '',
+      'author_last_name' => '',
+    );
+
+    if (!empty($row->author_sunetid)) {
+      $authors_sunetid = explode('|', $row->author_sunetid);
+      foreach ($authors_sunetid as $author_sunetid) {
+        $lines[] = array_merge($line, array('author_sunetid' => $author_sunetid));
+      }
+    }
+
+    if (!empty($row->author_first_name) && !empty($row->author_last_name)) {
+      $authors_first_names = explode('|', $row->author_first_name);
+      $authors_last_names = explode('|', $row->author_last_name);
+      if (count($authors_first_names) == count($authors_last_names)) {
+        foreach ($authors_first_names as $key => $author_first_name) {
+          if ($author_first_name != 'multiple authors') {
+            $lines[] = array_merge($line, array(
+              'author_first_name' => $authors_first_names[$key],
+              'author_last_name' =>  $authors_last_names[$key],
+            ));
+          }
+        }
+      }
+    }
+
+    // Write CSV file.
+    foreach ($lines as $line) {
+      $line = implode(',', $line) . "\n";
+      file_put_contents($filename, $line, FILE_APPEND | LOCK_EX);
+    }
+  }
+}
+
+class GSBPublicationAuthorsMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBPublication', 'GSBFacultyInsert', 'GSBFacultyUpdate');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns(), array(), $this->fields());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+        'faculty_nid' => array(
+          'type' => 'int',
+        ),
+        'author_first_name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'default' => '',
+        ),
+        'author_last_name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'default' => '',
+        ),
+      ),
+      MigrateDestinationFieldCollection::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFieldCollection(
+      'field_authors',
+      array('host_entity_type' => 'node')
+    );
+
+    $this->addFieldMapping('host_entity_id', 'nid')
+      ->sourceMigration('GSBPublication');
+
+    $this->addFieldMapping('field_person_fac_or_other', 'fac_or_other');
+    $this->addFieldMapping('field_person_fac_single_ref', 'faculty_nid');
+    $this->addFieldMapping('field_first_name', 'author_first_name');
+    $this->addFieldMapping('field_last_name', 'author_last_name');
+  }
+
+  protected function fields() {
+    $fields = array();
+
+    $fields['fac_or_other'] = 'Field switcher for Authors field collection. Possible values: UseEntityReference, Other';
+    $fields['faculty_nid'] = 'Faculty NID looked up by sunetid in prepareRow().';
+
+    return $fields;
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0] = array('nid', 'Nid');
+    $columns[1] = array('author_sunetid', 'Author SUNETID');
+    $columns[2] = array('author_first_name', 'Non GSB Author First Name');
+    $columns[3] = array('author_last_name', 'Non GSB Author Last Name');
+
+    return $columns;
+  }
+
+  public function prepareKey($source_key, $row) {
+    parent::prepareKey($source_key, $row);
+    $key['author_first_name'] = $row->author_first_name;
+    $key['author_last_name'] = $row->author_last_name;
+
+    return $key;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->nid . "\n";
+
+    if (!empty($row->author_sunetid)) {
+      // Migrate only if faculty author was migrated and is available.
+      $query = new EntityFieldQuery();
+      $query->entityCondition('entity_type', 'node')
+        ->entityCondition('bundle', 'faculty')
+        ->fieldCondition('field_sunetid', 'value', $row->author_sunetid);
+      $result = $query->execute();
+      if (isset($result['node'])) {
+        $faculty_nid = array_keys($result['node']);
+        $row->faculty_nid = $faculty_nid;
+        $row->fac_or_other = 'UseEntityReference';
+      }
+      else {
+        $this->queueMessage(t('Faculty author with sunetid %sunetid is not available. Skipped.',
+          array('%sunetid' => $row->author_sunetid)));
+        return FALSE;
+      }
+    }
+
+    if (!empty($row->author_first_name) && !empty($row->author_last_name)) {
+      $row->fac_or_other = 'Other';
+    }
+
+    return TRUE;
+  }
+}
