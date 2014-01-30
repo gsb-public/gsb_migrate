@@ -567,9 +567,21 @@ class GSBBookAuthorsMigration extends DrupalMigration {
   }
 }
 
+/**
+ * Class GSBPublicationMigration
+ *  - Migrate class for Publication CT migration.
+ */
 class GSBPublicationMigration extends Migration {
+  /**
+   * Path for authors file generated during publications import.
+   */
+  public $filename;
+
   public function __construct(array $arguments) {
     parent::__construct($arguments);
+
+    // Set filename for publication-authors.csv file.
+    $this->filename = drupal_get_path('module', 'gsb_migrate') . '/data/publication-authors.csv';
 
     // Create a MigrateSource object, which manages retrieving the input data.
     $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns(), array(), $this->fields());
@@ -627,6 +639,12 @@ class GSBPublicationMigration extends Migration {
     return $columns;
   }
 
+  public function preImport() {
+    parent::preImport();
+    // Before import ensure we have a newly generated authors.csv.
+    file_unmanaged_delete($this->filename);
+  }
+
   protected function fields() {
     $fields = array();
 
@@ -671,7 +689,6 @@ class GSBPublicationMigration extends Migration {
   }
 
   function complete($entity, stdClass $row) {
-    $filename = drupal_get_path('module', 'gsb_migrate') . '/data/publication-authors.csv';
     $lines = array();
     $line = array(
       'nid' => $row->nid,
@@ -705,7 +722,7 @@ class GSBPublicationMigration extends Migration {
     // Write CSV file.
     foreach ($lines as $line) {
       $line = implode(',', $line) . "\n";
-      file_put_contents($filename, $line, FILE_APPEND | LOCK_EX);
+      file_put_contents($this->filename, $line, FILE_APPEND | LOCK_EX);
     }
   }
 }
@@ -754,6 +771,10 @@ class GSBPublicationAuthorsMigration extends Migration {
     $this->addFieldMapping('field_last_name', 'author_last_name');
   }
 
+  /**
+   * Define additional computed fields.
+   * @return array
+   */
   protected function fields() {
     $fields = array();
 
@@ -775,14 +796,6 @@ class GSBPublicationAuthorsMigration extends Migration {
     return $columns;
   }
 
-  public function prepareKey($source_key, $row) {
-    parent::prepareKey($source_key, $row);
-    $key['author_first_name'] = $row->author_first_name;
-    $key['author_last_name'] = $row->author_last_name;
-
-    return $key;
-  }
-
   function prepareRow($row) {
     if (parent::prepareRow($row) === FALSE) {
       return FALSE;
@@ -800,6 +813,8 @@ class GSBPublicationAuthorsMigration extends Migration {
       $result = $query->execute();
       if (isset($result['node'])) {
         $faculty_nid = array_keys($result['node']);
+
+        // We've found a faculty author and we set fac_or_other to use entity reference.
         $row->faculty_nid = $faculty_nid;
         $row->fac_or_other = 'UseEntityReference';
       }
@@ -810,8 +825,14 @@ class GSBPublicationAuthorsMigration extends Migration {
       }
     }
 
+    // Set fac_or_other to Other in case we have simple First Name and Last Name.
     if (!empty($row->author_first_name) && !empty($row->author_last_name)) {
       $row->fac_or_other = 'Other';
+    }
+
+    // Ensure we have a value for faculty_nid.
+    if (empty($row->faculty_nid)) {
+      $row->faculty_nid = 0;
     }
 
     return TRUE;
