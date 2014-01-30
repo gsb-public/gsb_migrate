@@ -689,6 +689,9 @@ class GSBPublicationMigration extends Migration {
   }
 
   function complete($entity, stdClass $row) {
+    // Do nothing when authors.csv is already built. This code is left here to rebuild authors.csv when changes will appear.
+    return;
+
     $lines = array();
     $line = array(
       'nid' => $row->nid,
