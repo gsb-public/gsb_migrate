@@ -485,8 +485,10 @@ class GSBBookMigration extends DrupalNode7Migration {
 
     if (!empty($row->field_year_published[0])) {
       // Convert year to a format that date module can digest.
-      $converted_date = DateTime::createFromFormat('Y', $row->field_year_published[0])->format('Y-m-d H:i:s');
-      $row->field_year_published[0] = $converted_date;
+      $timestamp = strtotime($row->field_year_published[0]);
+      $date_time = date_create('@' . $timestamp);
+      $date = date_format($date_time, 'Y') . '-01-01 00:00:00';      
+      $row->field_year_published[0] = $date;
     }
   }
 }
