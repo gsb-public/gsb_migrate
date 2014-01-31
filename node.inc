@@ -640,12 +640,6 @@ class GSBPublicationMigration extends Migration {
     return $columns;
   }
 
-  public function preImport() {
-    parent::preImport();
-    // Before import ensure we have a newly generated authors.csv.
-    file_unmanaged_delete($this->filename);
-  }
-
   protected function fields() {
     $fields = array();
 
@@ -664,7 +658,7 @@ class GSBPublicationMigration extends Migration {
 
     if (!empty($row->publication_year)) {
       // Convert year to a format that date module can digest.
-      if ($converted_date = DateTime::createFromFormat('Y', $row->publication_year)) {
+      if ($converted_date = DateTime::createFromFormat('Y-m-d H:i:s', $row->publication_year . '-01-01 00:00:00')) {
         $row->publication_year = $converted_date->format('Y-m-d H:i:s');
       }
       else {
