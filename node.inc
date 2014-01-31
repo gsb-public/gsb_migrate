@@ -612,6 +612,7 @@ class GSBPublicationMigration extends Migration {
     $this->addFieldMapping('field_volume_number', 'volume');
     $this->addFieldMapping('field_issue_number', 'issue');
     $this->addFieldMapping('field_page_count', 'pages');
+    $this->addFieldMapping('field_link_single', 'link_to_source');
   }
 
   /**
