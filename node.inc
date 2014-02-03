@@ -863,7 +863,8 @@ class GSBBusinessWebsiteMigration extends Migration {
     $this->addSimpleMappings(array('title'));
     $this->addFieldMapping('field_link_single', 'link');
     $this->addFieldMapping('field_bus_website_description', 'description');
-    $this->addFieldMapping('field_bus_website_categories', 'category');
+    $this->addFieldMapping('field_bus_website_categories', 'category')
+      ->separator(':');
     $this->addFieldMapping('uid')
       ->defaultValue(1);
     $this->addFieldMapping('status')
