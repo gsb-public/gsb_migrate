@@ -150,6 +150,20 @@ function gsb_migrate_register_migrations() {
     'source_file' => $directory . 'publication-authors.csv',
   );
   Migration::registerMigration($publication_authors['class_name'], $publication_authors['machine_name'], $publication_authors);
+
+  $business_website_categories = array(
+    'group_name' => 'content',
+    'source_file' => $directory . 'business_sites_categories.csv',
+    'destination_vocabulary' => 'business_website_categories',
+  );
+  Migration::registerMigration('GSBTaxonomyBusWebsiteCategoriesMigration', NULL, $business_website_categories);
+
+  $business_website = array(
+    'group_name' => 'content',
+    'source_file' => $directory . 'business_sites.csv',
+
+  );
+  Migration::registerMigration('GSBBusinessWebsiteMigration', NULL, $business_website);
 }
 
 /**

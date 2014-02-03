@@ -837,3 +837,58 @@ class GSBPublicationAuthorsMigration extends Migration {
     return TRUE;
   }
 }
+
+/**
+ * Class GSBBusinessWebsiteMigration
+ *  - Migrate class for Business Website CT migration.
+ */
+class GSBBusinessWebsiteMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBTaxonomyBusWebsiteCategories');
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'csvrownum' => array(
+          'type' => 'int',
+          'not null' => true,
+        ),
+      ),
+      MigrateDestinationNode::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationNode('business_website');
+
+    $this->addSimpleMappings(array('title'));
+    $this->addFieldMapping('field_link_single', 'link');
+    $this->addFieldMapping('field_bus_website_description', 'description');
+    $this->addFieldMapping('field_bus_website_categories', 'category');
+    $this->addFieldMapping('uid')
+      ->defaultValue(1);
+    $this->addFieldMapping('status')
+      ->defaultValue(TRUE);
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0]  = array('category', 'Category');
+    $columns[1]  = array('title', 'Title');
+    $columns[2]  = array('description', 'Description');
+    $columns[3]  = array('link', 'Link to website');
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->csvrownum . '. ' . $row->title . "\n";
+
+    return TRUE;
+  }
+}

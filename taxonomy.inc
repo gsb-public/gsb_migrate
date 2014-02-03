@@ -35,3 +35,32 @@ class GSBTaxonomyAcademicAreaMigration extends DrupalTerm7Migration {
     return TRUE;
   }
 }
+
+class GSBTaxonomyBusWebsiteCategoriesMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // Create our three main objects - source, destination, and map
+    $this->source = new MigrateSourceCSV($this->arguments['source_file'], $this->csvcolumns());
+
+    $this->destination = new MigrateDestinationTerm($this->arguments['destination_vocabulary']);
+
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'term_name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'description' => 'Source term',
+        ),
+      ),
+      MigrateDestinationTerm::getKeySchema()
+    );
+
+    $this->addFieldMapping('name', 'term_name');
+  }
+
+  public function csvcolumns() {
+    return array(array('term_name', 'Source term name'));
+  }
+}
