@@ -164,6 +164,13 @@ function gsb_migrate_register_migrations() {
 
   );
   Migration::registerMigration('GSBBusinessWebsiteMigration', NULL, $business_website);
+
+  $media_item = array(
+    'group_name' => 'content',
+    'source_file' => $directory . 'media_item.csv',
+  );
+  Migration::registerMigration('GSBMediaItemMigration', NULL, $media_item)
+  ;
 }
 
 /**
@@ -211,4 +218,18 @@ function array_strip_tags($array) {
   }
 
   return $array;
+}
+
+/**
+ * Helper function to convert YES/NO strings to TRUE/FALSE bool.
+ * @param $value
+ * @return bool
+ */
+function gsb_string_to_bool($value) {
+  if (strtolower($value) == 'yes') {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
 }

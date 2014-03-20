@@ -893,3 +893,102 @@ class GSBBusinessWebsiteMigration extends Migration {
     return TRUE;
   }
 }
+
+class GSBMediaItemMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => true,
+        ),
+      ),
+      MigrateDestinationNode::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationNode('media_item');
+
+    $this->addSimpleMappings(array('title'));
+    $this->addFieldMapping('uid')
+      ->defaultValue(1);
+    $this->addFieldMapping('status', 'status')
+      ->callbacks('gsb_string_to_bool');
+    $this->addFieldMapping('field_editorial_summary', 'teaser');
+    $this->addFieldMapping('field_link_single', 'link_to_article');
+    $this->addFieldMapping('field_person_fac_single_ref', 'faculty');
+    $this->addFieldMapping('field_profile_visibility')
+      ->defaultValue(TRUE);
+    $this->addFieldMapping('field_pub_book_title', 'source_publication');
+    $this->addFieldMapping('field_date', 'publication_date');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0]  = array('nid', 'Newsmaker NID');
+    $columns[1]  = array('title', 'Title');
+    $columns[2]  = array('uid', 'Author uid');
+    $columns[3]  = array('name', 'Author name');
+    $columns[4]  = array('publication_date', 'Publication date');
+    $columns[5]  = array('created', 'Created date');
+    $columns[6]  = array('updated', 'Updated date');
+    $columns[7]  = array('content_image', 'Content Image available');
+    $columns[8]  = array('status', 'Status');
+    $columns[9]  = array('source_publication', 'Source publication');
+    $columns[10] = array('faculty', 'Faculty authors');
+    $columns[11] = array('function', 'Function (Taxonomy)');
+    $columns[12] = array('company', 'Company (Taxonomy)');
+    $columns[13] = array('principle', 'Principle (Taxonomy)');
+    $columns[14] = array('industry', 'Industry (Taxonomy)');
+    $columns[15] = array('operational_topics', 'Operational Topics (Taxonomy)');
+    $columns[16] = array('region', 'Region (Taxonomy)');
+    $columns[17] = array('sponsors', 'Operational Topics (Taxonomy)');
+    $columns[18] = array('tag', 'Tag (Taxonomy)');
+    $columns[19] = array('link_to_article', 'Link to Article');
+    $columns[20] = array('teaser', 'Teaser');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->csvrownum . '. ' . $row->title . "\n";
+
+    $row->publication_date = date('Y-m-d H:i:s', (int) $row->publication_date);
+    $faculty_authors = explode(', ', $row->faculty);
+    if (!empty($faculty_authors)) {
+      $sunetid = $faculty_authors[0];
+      $faculty_nid = $this->getFacultyNidBySunetid($sunetid);
+      if (is_numeric($faculty_nid)) {
+        $row->faculty = $faculty_nid;
+      }
+    }
+
+    return TRUE;
+  }
+
+  /**
+   * Fetch existing Faculty nid by sunetid.
+   * @param $sunetid
+   * @return $destination_id
+   */
+  public function getFacultyNidBySunetid($sunetid) {
+    $destination_id = db_select('field_data_field_sunetid', 'fs')
+      ->condition('field_sunetid_value', $sunetid)
+      ->condition('bundle', 'faculty')
+      ->fields('fs', array('entity_id'))
+      ->execute()
+      ->fetchField();
+
+    return $destination_id;
+  }
+}
