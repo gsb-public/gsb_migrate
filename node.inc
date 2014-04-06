@@ -923,7 +923,9 @@ class GSBMediaItemMigration extends Migration {
     $this->addFieldMapping('field_profile_visibility')
       ->defaultValue(TRUE);
     $this->addFieldMapping('field_pub_book_title', 'source_publication');
-    $this->addFieldMapping('field_date', 'publication_date');
+    $this->addFieldMapping('field_pub_date_day', 'publication_day');
+    $this->addFieldMapping('field_month', 'publication_month');
+    $this->addFieldMapping('field_year_of_publication', 'publication_year');
   }
 
   /**
@@ -935,23 +937,25 @@ class GSBMediaItemMigration extends Migration {
     $columns[2]  = array('uid', 'Author uid');
     $columns[3]  = array('name', 'Author name');
     $columns[4]  = array('publication_date', 'Publication date');
-    $columns[5]  = array('created', 'Created date');
-    $columns[6]  = array('updated', 'Updated date');
-    $columns[7]  = array('content_image', 'Content Image available');
-    $columns[8]  = array('status', 'Status');
-    $columns[9]  = array('source_publication', 'Source publication');
-    $columns[10] = array('faculty', 'Faculty authors');
-    $columns[11] = array('function', 'Function (Taxonomy)');
-    $columns[12] = array('company', 'Company (Taxonomy)');
-    $columns[13] = array('principle', 'Principle (Taxonomy)');
-    $columns[14] = array('industry', 'Industry (Taxonomy)');
-    $columns[15] = array('operational_topics', 'Operational Topics (Taxonomy)');
-    $columns[16] = array('region', 'Region (Taxonomy)');
-    $columns[17] = array('sponsors', 'Operational Topics (Taxonomy)');
-    $columns[18] = array('tag', 'Tag (Taxonomy)');
-    $columns[19] = array('link_to_article', 'Link to Article');
-    $columns[20] = array('teaser', 'Teaser');
-
+    $columns[5]  = array('publication_day', 'Publication Day');
+    $columns[6]  = array('publication_month', 'Publication Month');
+    $columns[7]  = array('publication_year', 'Publication Year');
+    $columns[8]  = array('created', 'Created date');
+    $columns[9]  = array('updated', 'Updated date');
+    $columns[10]  = array('content_image', 'Content Image available');
+    $columns[11]  = array('status', 'Status');
+    $columns[12]  = array('source_publication', 'Source publication');
+    $columns[13] = array('faculty', 'Faculty authors');
+    $columns[14] = array('function', 'Function (Taxonomy)');
+    $columns[15] = array('company', 'Company (Taxonomy)');
+    $columns[16] = array('principle', 'Principle (Taxonomy)');
+    $columns[17] = array('industry', 'Industry (Taxonomy)');
+    $columns[18] = array('operational_topics', 'Operational Topics (Taxonomy)');
+    $columns[19] = array('region', 'Region (Taxonomy)');
+    $columns[20] = array('sponsors', 'Operational Topics (Taxonomy)');
+    $columns[21] = array('tag', 'Tag (Taxonomy)');
+    $columns[22] = array('link_to_article', 'Link to Article');
+    $columns[23] = array('teaser', 'Teaser');
     return $columns;
   }
 
@@ -963,7 +967,13 @@ class GSBMediaItemMigration extends Migration {
     // Left here for debugging.
     print $row->csvrownum . '. ' . $row->title . "\n";
 
-    $row->publication_date = date('Y-m-d H:i:s', (int) $row->publication_date);
+    if (!empty($row->publication_year)) {
+      // Convert year to a format that date module can digest.
+      if ($date = date_create_from_format('Y-m-d H:i:s', $row->publication_year . '-01-01 00:00:00')) {
+        $row->publication_year = date_format($date, 'Y-m-d H:i:s');
+      }
+    }
+
     $faculty_authors = explode(', ', $row->faculty);
     if (!empty($faculty_authors)) {
       $sunetid = $faculty_authors[0];

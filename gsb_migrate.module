@@ -169,8 +169,7 @@ function gsb_migrate_register_migrations() {
     'group_name' => 'content',
     'source_file' => $directory . 'media_item.csv',
   );
-  Migration::registerMigration('GSBMediaItemMigration', NULL, $media_item)
-  ;
+  Migration::registerMigration('GSBMediaItemMigration', NULL, $media_item);
 }
 
 /**
