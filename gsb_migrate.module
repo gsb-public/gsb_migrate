@@ -169,8 +169,14 @@ function gsb_migrate_register_migrations() {
     'group_name' => 'content',
     'source_file' => $directory . 'media_item.csv',
   );
-  Migration::registerMigration('GSBMediaItemMigration', NULL, $media_item)
-  ;
+  Migration::registerMigration('GSBMediaItemMigration', NULL, $media_item);
+  
+  $working_paper_other_authors = array(
+    'group_name' => 'content',
+    'source_file' => $directory . 'working_paper_other_authors.csv',
+  );
+  Migration::registerMigration('GSBWorkingPaperOtherAuthorsMigration', NULL, $working_paper_other_authors);  
+  
 }
 
 /**
