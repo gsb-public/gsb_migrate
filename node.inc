@@ -992,3 +992,119 @@ class GSBMediaItemMigration extends Migration {
     return $destination_id;
   }
 }
+
+/**
+ * Class GSBWorkingPaperOtherAuthorsMigration
+ *  - Migrate class for Working Paper CT Other Authors migration.
+ */
+class GSBWorkingPaperOtherAuthorsMigration extends Migration {
+  
+  public function __construct(array $arguments) {
+
+    parent::__construct($arguments);
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns(), array(), $this->fields());
+
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+        'author_first_name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'default' => '',
+        ),
+        'author_last_name' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'default' => '',
+        ),
+      ),
+      MigrateDestinationFieldCollection::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFieldCollection(
+      'field_authors',
+      array('host_entity_type' => 'node')
+    );
+
+    $this->addFieldMapping('host_entity_id', 'nid');
+
+    $this->addFieldMapping('field_person_fac_single_ref', 'faculty_nid');
+    $this->addFieldMapping('field_first_name', 'author_first_name');
+    $this->addFieldMapping('field_last_name', 'author_last_name');
+
+    $this->addFieldMapping('field_person_fac_or_other', 'fac_or_other');
+
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0] = array('nid', 'Node Id');
+    $columns[1] = array('author_first_name', 'First Name');
+    $columns[2] = array('author_last_name', 'Last Name');
+    return $columns;
+  }
+
+  function prepareRow($row) {
+
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    $nid = $row->nid;
+    $first_name = $row->author_first_name;
+    $last_name = $row->author_last_name;
+
+    $node = node_load($nid);
+
+    if (!$node) {
+      print 'no node for nid = '.$nid.PHP_EOL;
+      return FALSE;
+    }
+
+    $ewrapper = entity_metadata_wrapper('node', $node);
+    if (empty($ewrapper->field_authors)) {
+      return FALSE;
+    }
+
+    // get the current list of authors saved with the node
+    $authors = $ewrapper->field_authors->value();
+
+    $found = false;
+    foreach($authors as $author) {
+      $ewrap_author = entity_metadata_wrapper('field_collection_item', $author);
+      $fn = $ewrap_author->field_first_name->value();
+      $ln = $ewrap_author->field_last_name->value();
+      if ($fn == $first_name && $ln == $last_name) {
+        $found = true;
+        break;
+      }
+    }
+
+    if ($found) {
+      return FALSE;
+    }
+
+    $row->faculty_nid = 0;
+    $row->fac_or_other = 'Other';
+    
+    return TRUE;
+  }
+  
+  /**
+   * Define additional computed fields.
+   * @return array
+   */
+  protected function fields() {
+    $fields = array();
+    $fields['fac_or_other'] = 'Field switcher for Authors field collection. Possible values: UseEntityReference, Other';
+    $fields['faculty_nid'] = 'Faculty NID looked up by sunetid in prepareRow().';
+    return $fields;
+  }
+}
