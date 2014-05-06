@@ -1118,3 +1118,315 @@ class GSBWorkingPaperOtherAuthorsMigration extends Migration {
     return $fields;
   }
 }
+
+/**
+ * Class GSBWorkingPaperItemsMigration
+ *  - Migrate class for Working Paper CT Items migration.
+ */
+class GSBWorkingPaperItemsMigration extends Migration {
+  
+  public function __construct(array $arguments) {
+
+    parent::__construct($arguments);
+
+    // Set filename for publication-authors.csv file.
+    $this->filename = drupal_get_path('module', 'gsb_migrate') . '/data/working_paper_new_nodes.csv';
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns(), array(), $this->fields());
+
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'item_id' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationNode::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationNode('working_paper');
+
+    $this->addFieldMapping('field_item_id', 'item_id');
+    $this->addFieldMapping('title', 'title');
+    $this->addFieldMapping('field_description', 'abstract');
+    $this->addFieldMapping('field_year_of_publication', 'pub_year');
+    $this->addFieldMapping('field_person_fac_single_ref', 'sunet_ids');
+    $this->addFieldMapping('field_first_name', 'first_names');
+    $this->addFieldMapping('field_last_name', 'last_names');
+
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0] = array('item_id', 'Item Id');
+    $columns[1] = array('title', 'Title');
+    $columns[2] = array('abstract', 'Abstract');    
+    $columns[3] = array('pub_year', 'Publication Year');
+    $columns[4] = array('sunet_ids', 'Sunet Ids');  
+    $columns[5] = array('first_names', 'First Names');      
+    $columns[6] = array('last_names', 'Last Names');
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    return TRUE;
+  }
+  
+  /**
+   * Define additional computed fields.
+   * @return array
+   */
+  protected function fields() {
+    $fields = array();
+    return $fields;
+  }
+
+  function complete($entity, stdClass $row) {
+
+    $nid = $entity->nid;
+
+    $node = node_load($nid);
+
+    $ewrapper = entity_metadata_wrapper('node', $nid);
+
+    // set the publication year
+
+    $date = new DateTime($row->pub_year."-01-01");
+    $ewrapper->field_year_of_publication->set($date->getTimestamp());
+    $ewrapper->field_month->set(NULL);    
+
+    // set the sunet authors
+
+    $this->add_sunet_authors($node,$ewrapper,str_replace(' | ', ',', $row->sunet_ids));
+
+    // set the 'other' authors
+
+    if (!empty($row->first_names) && !empty($row->last_names)) {
+      $authors_first_names = explode('|', $row->first_names);
+      $authors_last_names = explode('|', $row->last_names);   
+      if (count($authors_first_names) == count($authors_last_names)) { 
+        foreach ($authors_first_names as $key => $author_first_name) {
+          $first_name = trim($authors_first_names[$key]);
+          $last_name = trim($authors_last_names[$key]);   
+          $this->add_other_author($node, $first_name, $last_name);
+        }
+      }
+    }   
+
+    $ewrapper->save();  
+
+    // write out a report file of the new nodes that were created
+
+    $this->new_nodes_report($nid, $row);
+
+    // set the status of the node to published
+
+    $node = node_load($nid);
+    $node->status = 1;     
+    node_save($node);   
+
+  } 
+
+  function wrapper_debug($w) {
+    $values = array();
+    foreach ($w->getPropertyInfo() as $key => $val) {
+      $values[$key] = $w->$key->value();
+    }
+    return $values;
+  }
+
+
+  /**
+   * Write out a report file of the new nodes that were created
+   */
+  function new_nodes_report($nid, stdClass $row) {
+
+    $lines = array();
+
+    $others = array();
+
+    if (!empty($row->first_names) && !empty($row->last_names)) {
+      $authors_first_names = explode('|', $row->first_names);
+      $authors_last_names = explode('|', $row->last_names);   
+      if (count($authors_first_names) == count($authors_last_names)) { 
+        foreach ($authors_first_names as $key => $author_first_name) {
+          $others[] = trim($authors_first_names[$key]) . ' ' . trim($authors_last_names[$key]);   
+        }
+      }
+    }
+
+    $author_others = '';
+    if (!empty($others)) {
+      $author_others = '"' . implode(',', $others) . '"';
+    }
+    
+    $line = array(
+      'nid' => $nid,
+      'title' => '"' . $row->title . '"',
+      'item_id' => $row->item_id,
+      'abstract' => '"' . $row->abstract . '"',
+      'pub_year' => $row->pub_year,
+      'author_sunetids' => '"' . str_replace(' | ', ',', $row->sunet_ids) . '"',
+      'author_others' => $author_others,
+    );     
+
+    $lines[] = $line;
+
+    // Write CSV file.
+    foreach ($lines as $line) {
+      $line = implode(',', $line) . "\n";
+      file_put_contents($this->filename, $line, FILE_APPEND | LOCK_EX);
+    }
+
+  }
+
+  /**
+   * Get sunet authors from the Alfresco doc properties
+   */
+  function add_sunet_authors($node,$ewrapper,$sunet_ids) {
+
+    $sunet_ids = array_map('trim', explode(',', $sunet_ids));
+
+    // lookup the node ids related to these ids
+    $query = db_select('field_data_field_sunetid', 'su');
+    $query->fields('su', array('bundle', 'entity_id', 'field_sunetid_value'));
+    $query->condition('su.field_sunetid_value',$sunet_ids,'IN');
+    $result = $query->execute();
+
+    // gather a list of entity ids to add and remove
+    $add_entity_ids = array();
+    $del_field_collection_items = array();
+
+    // start by putting all these node ids in the add list
+    foreach ($result as $record) {
+      $add_entity_ids[$record->entity_id] = $record->entity_id;
+    }
+
+    // get the current list of authors saved with the node
+    $authors = $ewrapper->field_authors->value();
+
+    // if any of the author ids match one of the sunetid node ids, then
+    // we don't need to add it, and can remove it from our add list.
+    // also... 
+    // if an author id isn't in the add list, then it needs to be removed
+    // so we'll add it to our delete list.
+    foreach($authors as $author) {
+      $ewrap_author = entity_metadata_wrapper('field_collection_item', $author);
+      $ref = $ewrap_author->field_person_fac_single_ref->value();
+      if ($ref) {
+        $author_nid = $ref->nid;
+        if (!empty($add_entity_ids[$author_nid])) {
+          unset($add_entity_ids[$author_nid]);
+        } else {
+          $del_field_collection_items[] = $author;
+        }
+      }
+    }
+
+    // check for an 'default/empty' author field collection
+    // remove if this is the case, and we have authors to add
+    $found_default = FALSE;
+    if (count($authors) == 1) {
+      if (empty($authors[0]->field_first_name)) {
+        if (empty($authors[0]->field_last_name)) {
+          if (empty($authors[0]->field_person_fac_single_ref)) {
+            $found_default = TRUE;
+          }
+        }
+      }
+    }
+    if ($found_default && count($add_entity_ids) > 0) {
+      $ewrapper->field_authors->set(NULL);
+    }   
+
+    // add any new authors that came for the sunetids
+    foreach ($add_entity_ids as $entity_id) {
+      $this->add_author($node, $entity_id);
+    }    
+
+    // delete any authors that are no longer sunetids in Alfresco
+    foreach($del_field_collection_items as $item) {
+      $item->delete();
+    }
+
+  }  
+
+  /**
+   * Add an author entity ref (via field_authors field collection) 
+   * to the node's current list
+   */
+  function add_author($node, $entity_id) {
+
+    $language = $node->language;
+
+    $field_collection_item = entity_create('field_collection_item', array('field_name' => 'field_authors'));
+    $field_collection_item->setHostEntity('node', $node);
+
+    $field_collection_item->field_person_fac_single_ref = array(
+      $language => array(array('target_id' => $entity_id)),
+    );
+
+    $field_collection_item->field_person_fac_or_other = array(
+      $language => array(array('value' => 'UseEntityReference')),
+    );
+
+    $field_collection_item->field_first_name = array();
+    $field_collection_item->field_last_name = array();
+
+    $field_collection_item->save();
+
+  }  
+
+  /**
+   * Add an author entity 'other' info (via field_authors field collection) 
+   * to the first and last name given.
+   */
+  function add_other_author($node, $first_name, $last_name) {
+
+    // Make a quick check to see if the author being added
+    // has faculty node and if so add them using their node ref
+    $query = new EntityFieldQuery('node');
+    $results = $query
+      ->entityCondition('bundle', 'faculty')
+      ->fieldCondition('field_first_name', 'value', $first_name)
+      ->fieldCondition('field_last_name', 'value', $last_name)
+      ->execute();
+    if (!empty($results['node'])) {
+      $entity_id = key($results['node']);
+      $this->add_author($node, $entity_id);
+      return;
+    }  
+
+    $field_collection_item = entity_create('field_collection_item', array('field_name' => 'field_authors'));
+    $field_collection_item->setHostEntity('node', $node);
+
+    $field_collection_item->field_person_fac_single_ref = array();
+
+    $field_collection_item->field_person_fac_or_other =  array(
+      'und' => array(array('value' => 'Other')),
+    );
+
+    $field_collection_item->field_first_name = array(
+      'und' => array(array('value' => $first_name)),
+    );
+
+    $field_collection_item->field_last_name = array(
+      'und' => array(array('value' => $last_name)),
+    );
+
+    $field_collection_item->field_profile_visibility =  array(
+      'und' => array(array('value' => '1')),
+    );
+
+    $field_collection_item->save();
+
+  }  
+
+}
+
