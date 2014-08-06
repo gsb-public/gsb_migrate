@@ -181,8 +181,25 @@ function gsb_migrate_register_migrations() {
     'group_name' => 'content',
     'source_file' => $directory . 'working_paper_items.csv',
   );
-  Migration::registerMigration('GSBWorkingPaperItemsMigration', NULL, $working_paper_items);     
-  
+  Migration::registerMigration('GSBWorkingPaperItemsMigration', NULL, $working_paper_items);
+
+  $idea_story = array(
+    'group_name' => 'idea_story',
+    'source_file' => $directory . 'idea_story.csv',
+  );
+  Migration::registerMigration('GSBIdeaStoryMigration', NULL, $idea_story);
+
+  $idea_story_byline = array(
+    'group_name' => 'idea_story',
+    'source_file' => $directory . 'idea_story_byline.csv',
+  );
+  Migration::registerMigration('GSBIdeaStoryBylineMigration', NULL, $idea_story_byline);
+
+  $idea_story_related = array(
+    'group_name' => 'idea_story',
+    'source_file' => $directory . 'idea_story_related.csv',
+  );
+  Migration::registerMigration('GSBIdeaStoryRelatedContentMigration', NULL, $idea_story_related);
 }
 
 /**
