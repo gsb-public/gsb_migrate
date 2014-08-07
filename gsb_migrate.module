@@ -200,6 +200,12 @@ function gsb_migrate_register_migrations() {
     'source_file' => $directory . 'idea_story_related.csv',
   );
   Migration::registerMigration('GSBIdeaStoryRelatedContentMigration', NULL, $idea_story_related);
+
+  $idea_story_resource_image = array(
+    'group_name' => 'idea_story',
+    'source_file' => $directory . 'idea_story.csv',
+  );
+  Migration::registerMigration('GSBIdeaStoryResourceImageMigration', NULL, $idea_story_resource_image);
 }
 
 /**

@@ -52,7 +52,8 @@ class GSBIdeaStoryMigration extends Migration {
     $this->addFieldMapping('field_person_fac_ref', 'related_faculty')
       ->separator(' | ');
     $this->addFieldMapping('field_related_idea_story', 'related_story')
-      ->separator(' | ');
+      ->separator(' | ')
+      ->sourceMigration('GSBIdeaStory');
 
     $this->addFieldMapping('field_academic_area_unlimited', 'academic_area');
     $this->addFieldMapping('field_academic_area_unlimited:create_term')
@@ -168,7 +169,33 @@ class GSBIdeaStoryMigration extends Migration {
       $row->alumni_story = TRUE;
     }
 
+    if (!empty($row->key_image) && strpos($row->key_image, 'imgur.com') !== FALSE) {
+      // URLs in CSV are of http://imgur.com/JYDJnfY format. We'll just dirty-convert them to publicly downloadable http://i.imgur.com/JYDJnfY.jpg
+      $row->key_image = str_replace('imgur.com', 'i.imgur.com', $row->key_image) . '.jpg';
+    }
+
+    // Avoid empty string lookup when creating stubs.
+    if (empty($row->related_story)) {
+      unset($row->related_story);
+    }
+
     return TRUE;
+  }
+
+
+  protected function createStub(Migration $migration, array $source_id) {
+    $node = new stdClass();
+    $node->title = t('Stub for @id', array('@id' => $source_id[0]));
+    $node->type = $this->destination->getBundle();
+    $node->uid = 1;
+    $node->status = 0;
+    node_save($node);
+    if (isset($node->nid)) {
+      return array($node->nid);
+    }
+    else {
+      return FALSE;
+    }
   }
 }
 
@@ -322,6 +349,62 @@ class GSBIdeaStoryRelatedContentMigration extends Migration {
 
     // Left here for debugging.
     print $row->nid . "\n";
+
+    return TRUE;
+  }
+}
+
+/**
+ * Class GSBIdeaStoryResourceImageMigration
+ *  - Migrate class for Idea Story Resource Inage migration.
+ */
+class GSBIdeaStoryResourceImageMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBIdeaStory');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'csvrownum' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationFile::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFile('resource_image', 'MigrateFileUri');
+    $this->addFieldMapping('value', 'image_uri');
+
+    $this->addFieldMapping('resource_host_node', 'nid')
+      ->sourceMigration('GSBIdeaStory');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[1] = array('nid', 'Idea Story NID');
+    $columns[24] = array('resource_name', 'Resource Name');
+    $columns[25] = array('image_uri', 'Image URI');
+    $columns[26] = array('image_caption', 'Image Caption');
+    $columns[27] = array('image_alt', 'Image Alt');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (empty($row->image_uri)) {
+      return FALSE;
+    }
+    // Left here for debugging.
+    print $row->csvrownum . "\n";
 
     return TRUE;
   }
