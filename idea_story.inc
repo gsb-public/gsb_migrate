@@ -356,7 +356,7 @@ class GSBIdeaStoryRelatedContentMigration extends Migration {
 
 /**
  * Class GSBIdeaStoryResourceImageMigration
- *  - Migrate class for Idea Story Resource Inage migration.
+ *  - Migrate class for Idea Story Resource Image migration.
  */
 class GSBIdeaStoryResourceImageMigration extends Migration {
   public function __construct(array $arguments) {
@@ -376,7 +376,10 @@ class GSBIdeaStoryResourceImageMigration extends Migration {
     );
 
     $this->destination = new MigrateDestinationFile('resource_image', 'MigrateFileUri');
-    $this->addFieldMapping('value', 'image_uri');
+    $this->addFieldMapping('value', 'resource_image_uri');
+    // @todo: Add filename and type to available destination fields. Or consider resource_type field.
+    $this->addFieldMapping('filename', 'resource_image_name');
+    $this->addFieldMapping('type')->defaultValue('resource_image');
 
     $this->addFieldMapping('resource_host_node', 'nid')
       ->sourceMigration('GSBIdeaStory');
@@ -387,10 +390,10 @@ class GSBIdeaStoryResourceImageMigration extends Migration {
    */
   protected function csvcolumns() {
     $columns[1] = array('nid', 'Idea Story NID');
-    $columns[24] = array('resource_name', 'Resource Name');
-    $columns[25] = array('image_uri', 'Image URI');
-    $columns[26] = array('image_caption', 'Image Caption');
-    $columns[27] = array('image_alt', 'Image Alt');
+    $columns[24] = array('resource_image_name', 'Resource Name');
+    $columns[25] = array('resource_image_uri', 'Resource Image URI');
+    $columns[26] = array('resource_image_caption', 'Resource Image Caption');
+    $columns[27] = array('resource_image_alt', 'Resource Image Alt');
 
     return $columns;
   }
@@ -400,7 +403,122 @@ class GSBIdeaStoryResourceImageMigration extends Migration {
       return FALSE;
     }
 
-    if (empty($row->image_uri)) {
+    if (empty($row->resource_image_uri)) {
+      return FALSE;
+    }
+    // Left here for debugging.
+    print $row->csvrownum . "\n";
+
+    return TRUE;
+  }
+}
+
+/**
+ * Class GSBIdeaStoryResourceYoutubeMigration
+ *  - Migrate class for Idea Story Resource Youtube migration.
+ */
+class GSBIdeaStoryResourceYoutubeMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBIdeaStory');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'csvrownum' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationFile::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFile('resource_youtube', 'ResourcesResourcesFile');
+    //$this->addFieldMapping('value', 'resource_video_url');
+    $this->addFieldMapping('field_youtube_embed_code', 'resource_video_url');
+    $this->addFieldMapping('filename', 'resource_video_name');
+    $this->addFieldMapping('resource_type')->defaultValue('resource_youtube');
+
+    $this->addFieldMapping('resource_host_node', 'nid')
+      ->sourceMigration('GSBIdeaStory');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[1] = array('nid', 'Idea Story NID');
+    $columns[22]  = array('resource_video_name', 'Resource Video Name');
+    $columns[23]  = array('resource_video_url', 'Resource Video URL');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (empty($row->resource_video_url)) {
+      return FALSE;
+    }
+    // Left here for debugging.
+    print $row->csvrownum . "\n";
+
+    return TRUE;
+  }
+}
+
+/**
+ * Class GSBIdeaStoryResourceYoutubeMigration
+ *  - Migrate class for Idea Story Resource Youtube migration.
+ */
+class GSBIdeaStoryResourceCalloutMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBIdeaStory');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'csvrownum' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationFile::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFile('resource_pull_quote', 'ResourcesResourcesFile');
+    $this->addFieldMapping('filename', 'resource_callout_name');
+    $this->addFieldMapping('field_description', 'resource_callout_text');
+    $this->addFieldMapping('field_quote_author', 'resource_callout_attribution');
+    $this->addFieldMapping('resource_type')->defaultValue('resource_callout');
+
+    $this->addFieldMapping('resource_host_node', 'nid')
+      ->sourceMigration('GSBIdeaStory');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[1] = array('nid', 'Idea Story NID');
+    $columns[28]  = array('resource_callout_name', 'Resource Callout Name');
+    $columns[29]  = array('resource_callout_text', 'Resource Callout Text');
+    $columns[30]  = array('resource_callout_attribution', 'Resource Callout Attribution');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (empty($row->resource_callout_name)) {
       return FALSE;
     }
     // Left here for debugging.
