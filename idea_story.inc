@@ -121,6 +121,8 @@ class GSBIdeaStoryMigration extends Migration {
     $columns[37]  = array('circle', 'Circle');
     $columns[38]  = array('tag', 'Tag');
     $columns[39]  = array('alumni_program', 'Alumni Program');
+    $columns[40]  = array('resource_twitter_name', 'Resource Twitter Name');
+    $columns[41]  = array('resource_twitter_url', 'Resource Twitter URL');
 
     return $columns;
   }
@@ -461,6 +463,63 @@ class GSBIdeaStoryResourceYoutubeMigration extends Migration {
     }
 
     if (empty($row->resource_video_url)) {
+      return FALSE;
+    }
+    // Left here for debugging.
+    print $row->csvrownum . "\n";
+
+    return TRUE;
+  }
+}
+
+
+/**
+ * Class GSBIdeaStoryResourceTwitterMigration
+ *  - Migrate class for Idea Story Resource Twitter migration.
+ */
+class GSBIdeaStoryResourceTwitterMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBIdeaStory');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'csvrownum' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationFile::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFile('resource_twitter', 'ResourcesResourcesFile');
+    $this->addFieldMapping('field_twitter_url', 'resource_twitter_url');
+    $this->addFieldMapping('filename', 'resource_twitter_name');
+    $this->addFieldMapping('resource_type')->defaultValue('resource_twitter');
+
+    $this->addFieldMapping('resource_host_node', 'nid')
+      ->sourceMigration('GSBIdeaStory');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[1] = array('nid', 'Idea Story NID');
+    $columns[40]  = array('resource_twitter_name', 'Resource Twitter Name');
+    $columns[41]  = array('resource_twitter_url', 'Resource Twitter URL');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    if (empty($row->resource_twitter_url)) {
       return FALSE;
     }
     // Left here for debugging.

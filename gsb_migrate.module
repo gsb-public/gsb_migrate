@@ -201,23 +201,21 @@ function gsb_migrate_register_migrations() {
   );
   Migration::registerMigration('GSBIdeaStoryRelatedContentMigration', NULL, $idea_story_related);
 
-  $idea_story_resource_image = array(
+  $idea_story_resources_arguments = array(
     'group_name' => 'idea_story',
     'source_file' => $directory . 'idea_story.csv',
   );
-  Migration::registerMigration('GSBIdeaStoryResourceImageMigration', NULL, $idea_story_resource_image);
 
-  $idea_story_resource_youtube = array(
-    'group_name' => 'idea_story',
-    'source_file' => $directory . 'idea_story.csv',
+  $idea_story_resources = array(
+    'GSBIdeaStoryResourceImageMigration',
+    'GSBIdeaStoryResourceYoutubeMigration',
+    'GSBIdeaStoryResourceCalloutMigration',
+    'GSBIdeaStoryResourceTwitterMigration',
   );
-  Migration::registerMigration('GSBIdeaStoryResourceYoutubeMigration', NULL, $idea_story_resource_youtube);
 
-  $idea_story_resource_callout = array(
-    'group_name' => 'idea_story',
-    'source_file' => $directory . 'idea_story.csv',
-  );
-  Migration::registerMigration('GSBIdeaStoryResourceCalloutMigration', NULL, $idea_story_resource_callout);
+  foreach ($idea_story_resources as $class_name) {
+    Migration::registerMigration($class_name, NULL, $idea_story_resources_arguments);
+  }
 }
 
 /**
