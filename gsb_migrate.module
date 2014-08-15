@@ -197,9 +197,15 @@ function gsb_migrate_register_migrations() {
 
   $idea_story_related = array(
     'group_name' => 'idea_story',
-    'source_file' => $directory . 'idea_story_related.csv',
+    'source_file' => $directory . 'idea_story_related_content.csv',
   );
   Migration::registerMigration('GSBIdeaStoryRelatedContentMigration', NULL, $idea_story_related);
+
+  $idea_story_related = array(
+    'group_name' => 'idea_story',
+    'source_file' => $directory . 'idea_story_related_faculty.csv',
+  );
+  Migration::registerMigration('GSBIdeaStoryRelatedFacultyMigration', NULL, $idea_story_related);
 
   $idea_story_resources_arguments = array(
     'group_name' => 'idea_story',

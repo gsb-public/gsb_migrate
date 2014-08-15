@@ -67,14 +67,30 @@ class GSBIdeaStoryMigration extends Migration {
     $this->addFieldMapping('field_centers_research_programs', 'circle');
     $this->addFieldMapping('field_centers_research_programs:create_term')
       ->defaultValue(FALSE);
-    $this->addFieldMapping('field_tag', 'tag');
+    $this->addFieldMapping('field_tag', 'tag')
+      // Tags are lowercase.
+      ->callbacks('strtolower');
     $this->addFieldMapping('field_tag:create_term')
-      ->defaultValue(FALSE);
+      // For tags we want to create terms.
+      ->defaultValue(TRUE);
+
+    $this->addFieldMapping('field_rethink_date', 'rethink_date');
+    $this->addFieldMapping('field_part_of_rethink', 'part_of_rethink');
+
+    $this->addFieldMapping('field_year', 'stanford_business_year')
+      ->callbacks(array('GSBMigrateHelper', 'yearToDate'));
+    $this->addFieldMapping('field_part_of_business_magazine', 'part_of_business_magazine');
+
+    $this->addFieldMapping('field_season', 'stanford_business_season')
+      ->callbacks('strtolower');
 
     $this->addFieldMapping('field_alumni_story', 'alumni_story');
     $this->addFieldMapping('field_program_single', 'alumni_program');
     $this->addFieldMapping('field_program_single:create_term')
       ->defaultValue(FALSE);
+
+    // Create redirects.
+    $this->addFieldMapping('migrate_redirects', 'path');
   }
 
   /**
@@ -179,6 +195,22 @@ class GSBIdeaStoryMigration extends Migration {
     // Avoid empty string lookup when creating stubs.
     if (empty($row->related_story)) {
       unset($row->related_story);
+    }
+
+    if (!empty($row->field_rethink_date)) {
+      if ($date = date_create_from_format('m/d/Y G:i:s', $row->field_rethink_date)) {
+        $row->field_rethink_date = date_format($date, 'Y-m-d H:i:s');
+      }
+    }
+
+    // Check Rethink checkbox if field_rethink_date is set.
+    if (!empty($row->rethink_date)) {
+      $row->part_of_rethink = TRUE;
+    }
+
+    // Check Business Magazine checkbox if field_program_single is set.
+    if (!empty($row->stanford_business_year)) {
+      $row->part_of_business_magazine = TRUE;
     }
 
     return TRUE;
@@ -340,6 +372,65 @@ class GSBIdeaStoryRelatedContentMigration extends Migration {
     $columns[0] = array('nid', 'Nid');
     $columns[1] = array('label', 'Related Content Label');
     $columns[2] = array('target_id', 'Related Content Nid');
+
+    return $columns;
+  }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    print $row->nid . "\n";
+
+    return TRUE;
+  }
+}
+
+
+/**
+ * Class GSBIdeaStoryRelatedFacultyMigration
+ *  - Migrate class for Idea Story Related Faculty migration.
+ */
+class GSBIdeaStoryRelatedFacultyMigration extends Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->dependencies = array('GSBIdeaStory');
+
+    // Create a MigrateSource object, which manages retrieving the input data.
+    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
+    $this->map = new MigrateSQLMap($this->machineName,
+      array(
+        'nid' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+        'target_id' => array(
+          'type' => 'int',
+          'not null' => TRUE,
+        ),
+      ),
+      MigrateDestinationFieldCollection::getKeySchema()
+    );
+
+    $this->destination = new MigrateDestinationFieldCollection(
+      'field_related_faculty',
+      array('host_entity_type' => 'node')
+    );
+
+    $this->addFieldMapping('host_entity_id', 'nid')
+      ->sourceMigration('GSBIdeaStory');
+
+    $this->addFieldMapping('field_person_fac_single_ref', 'target_id');
+  }
+
+  /**
+   * Define field names for CSV columns.
+   */
+  protected function csvcolumns() {
+    $columns[0] = array('nid', 'Nid');
+    $columns[1] = array('target_id', 'Related Faculty Nid');
 
     return $columns;
   }

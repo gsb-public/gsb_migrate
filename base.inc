@@ -118,3 +118,15 @@ class GSBDrupal extends DrupalVersion7 {
     return $fields;
   }
 }
+
+/**
+ * Class GSBMigrateHelper.
+ *  - Encapsulates useful callbacks to trasform and prepare data for the import.
+ */
+class GSBMigrateHelper {
+  public static function yearToDate($year) {
+    if ($date = date_create_from_format('Y-m-d H:i:s', $year . '-01-01 00:00:00')) {
+      return date_format($date, 'Y-m-d H:i:s');
+    }
+  }
+}
