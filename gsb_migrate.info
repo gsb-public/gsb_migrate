@@ -8,5 +8,10 @@ dependencies[] = migrate_ui
 
 files[] = base.inc
 files[] = node.inc
-files[] = idea_story.inc
 files[] = taxonomy.inc
+files[] = field_collection.inc
+files[] = resources.inc
+
+files[] = idea_story.inc
+files[] = school_story.inc
+files[] = offsite_idea_story.inc

@@ -5,32 +5,18 @@
  * Class GSBIdeaStoryMigration
  *  - Migrate class for Idea Story CT migration.
  */
-class GSBIdeaStoryMigration extends Migration {
+class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
   public function __construct(array $arguments) {
     parent::__construct($arguments);
 
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'nid' => array(
-          'type' => 'int',
-          'not null' => true,
-        ),
-      ),
-      MigrateDestinationNode::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationNode('idea_story');
-
-    $this->addSimpleMappings(array('title', 'status'));
-    $this->addFieldMapping('uid')
-      ->defaultValue(1);
-    $this->addFieldMapping('field_editorial_summary', 'teaser');
     $this->addFieldMapping('field_body', 'body');
     $this->addFieldMapping('field_body:format')
       ->defaultValue('markdown');
-    $this->addFieldMapping('field_date', 'publication_date');
+
+    $date_utility = new GSBMigrateDateUtility('n/j/y g:i');
+    $this->addFieldMapping('field_date', 'publication_date')
+      ->callbacks(array($date_utility, 'convert'));
+
     $this->addFieldMapping('field_icon')
       ->defaultValue('written');
 
@@ -47,7 +33,12 @@ class GSBIdeaStoryMigration extends Migration {
       ->separator(' | ');
     $this->addFieldMapping('field_link_unlimited:title', 'related_link_text')
       ->separator(' | ');
-    $this->addFieldMapping('field_key_taxonomy', 'key_taxonomy');
+    $this->addFieldMapping('field_key_taxonomy', 'key_taxonomy')
+      ->separator('|')
+      ->callbacks(
+        array('GSBMigrateHelper', 'arrayTrim'),
+        array('GSBMigrateHelper', 'keyTaxonomyTidsLookup')
+      );
 
     $this->addFieldMapping('field_person_fac_ref', 'related_faculty')
       ->separator(' | ');
@@ -67,19 +58,24 @@ class GSBIdeaStoryMigration extends Migration {
     $this->addFieldMapping('field_centers_research_programs', 'circle');
     $this->addFieldMapping('field_centers_research_programs:create_term')
       ->defaultValue(FALSE);
-    $this->addFieldMapping('field_tag', 'tag')
+    $this->addFieldMapping('field_tag', 'keywords')
       // Tags are lowercase.
       ->callbacks('strtolower');
     $this->addFieldMapping('field_tag:create_term')
       // For tags we want to create terms.
       ->defaultValue(TRUE);
 
-    $this->addFieldMapping('field_rethink_date', 'rethink_date');
+    $date_utility = new GSBMigrateDateUtility('m/d/y');
+    $this->addFieldMapping('field_rethink_date', 'rethink_date')
+      ->callbacks(array($date_utility, 'convert'));
+
     $this->addFieldMapping('field_part_of_rethink', 'part_of_rethink');
 
     $this->addFieldMapping('field_year', 'stanford_business_year')
       ->callbacks(array('GSBMigrateHelper', 'yearToDate'));
     $this->addFieldMapping('field_part_of_business_magazine', 'part_of_business_magazine');
+    $this->addFieldMapping('field_volume_number', 'stanford_business_volume');
+    $this->addFieldMapping('field_issue_number', 'stanford_business_issue');
 
     $this->addFieldMapping('field_season', 'stanford_business_season')
       ->callbacks('strtolower');
@@ -96,7 +92,7 @@ class GSBIdeaStoryMigration extends Migration {
   /**
    * Define field names for CSV columns.
    */
-  protected function csvcolumns() {
+  public function csvcolumns() {
     $columns[0]   = array('status', 'Status');
     $columns[1]   = array('nid', 'NID');
     $columns[2]   = array('publication_date', 'Publication date');
@@ -135,10 +131,12 @@ class GSBIdeaStoryMigration extends Migration {
     $columns[35]  = array('additional_topics', 'Additional Topics');
     $columns[36]  = array('region', 'Region of Interest');
     $columns[37]  = array('circle', 'Circle');
-    $columns[38]  = array('tag', 'Tag');
+    $columns[38]  = array('keywords', 'Keywords');
     $columns[39]  = array('alumni_program', 'Alumni Program');
-    $columns[40]  = array('resource_twitter_name', 'Resource Twitter Name');
-    $columns[41]  = array('resource_twitter_url', 'Resource Twitter URL');
+    $columns[40]  = array('stanford_business_volume', 'Stanford Business Volume');
+    $columns[41]  = array('stanford_business_issue', '"Stanford Business Issue"');
+    $columns[42]  = array('resource_twitter_name', 'Resource Twitter Name');
+    $columns[43]  = array('resource_twitter_url', 'Resource Twitter URL');
 
     return $columns;
   }
@@ -146,40 +144,6 @@ class GSBIdeaStoryMigration extends Migration {
   function prepareRow($row) {
     if (parent::prepareRow($row) === FALSE) {
       return FALSE;
-    }
-
-    // Left here for debugging.
-    print $row->csvrownum . '. ' . $row->title . "\n";
-
-    if (!empty($row->publication_date)) {
-      if ($date = date_create_from_format('m/d/Y G:i:s', $row->publication_date)) {
-        $row->publication_date = date_format($date, 'Y-m-d H:i:s');
-      }
-    }
-
-    // Key taxonomy is a entity reference that references 3 vocabularies.
-    // We need to lookup term tids by term names for those vocabularies.
-    if (!empty($row->key_taxonomy)) {
-      $terms = array();
-      $term_names = explode('|', $row->key_taxonomy);
-      foreach ($term_names as $term_name) {
-        $term_name = trim($term_name);
-        $tid = db_query("SELECT tid FROM {taxonomy_term_data}
-                         WHERE name = :name
-                         AND vid IN (:vid)",
-          array(':name' => $term_name, ':vid' => array('101', '106', '196')))->fetchField();
-        if ($tid) {
-          // Entity reference field wants an entity id.
-          $terms[] = $tid;
-        }
-        else {
-          print 'Key Taxonomy term ' . $term_name . ' doesn\'t exist.' . "\n";
-        }
-      }
-
-      if (!empty($terms)) {
-        $row->key_taxonomy = $terms;
-      }
     }
 
     // Check Alumni Story checkbox if field_program_single is set.
@@ -197,12 +161,6 @@ class GSBIdeaStoryMigration extends Migration {
       unset($row->related_story);
     }
 
-    if (!empty($row->field_rethink_date)) {
-      if ($date = date_create_from_format('m/d/Y G:i:s', $row->field_rethink_date)) {
-        $row->field_rethink_date = date_format($date, 'Y-m-d H:i:s');
-      }
-    }
-
     // Check Rethink checkbox if field_rethink_date is set.
     if (!empty($row->rethink_date)) {
       $row->part_of_rethink = TRUE;
@@ -214,22 +172,6 @@ class GSBIdeaStoryMigration extends Migration {
     }
 
     return TRUE;
-  }
-
-
-  protected function createStub(Migration $migration, array $source_id) {
-    $node = new stdClass();
-    $node->title = t('Stub for @id', array('@id' => $source_id[0]));
-    $node->type = $this->destination->getBundle();
-    $node->uid = 1;
-    $node->status = 0;
-    node_save($node);
-    if (isset($node->nid)) {
-      return array($node->nid);
-    }
-    else {
-      return FALSE;
-    }
   }
 }
 
@@ -318,361 +260,6 @@ class GSBIdeaStoryBylineMigration extends Migration {
     if (!empty($row->byline_first_name) && !empty($row->byline_last_name)) {
       $row->fac_or_other = 'Other';
     }
-
-//    // Ensure we have a value for faculty_nid.
-//    if (empty($row->faculty_nid)) {
-//      $row->faculty_nid = 0;
-//    }
-
-    return TRUE;
-  }
-}
-
-/**
- * Class GSBIdeaStoryRelatedContentMigration
- *  - Migrate class for Idea Story Related Content migration.
- */
-class GSBIdeaStoryRelatedContentMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'nid' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-        'target_id' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFieldCollection::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFieldCollection(
-      'field_related_other_unlimited',
-      array('host_entity_type' => 'node')
-    );
-
-    $this->addFieldMapping('host_entity_id', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-
-    $this->addFieldMapping('field_related_other_label', 'label');
-    $this->addFieldMapping('field_related_other_content', 'target_id');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[0] = array('nid', 'Nid');
-    $columns[1] = array('label', 'Related Content Label');
-    $columns[2] = array('target_id', 'Related Content Nid');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    // Left here for debugging.
-    print $row->nid . "\n";
-
-    return TRUE;
-  }
-}
-
-
-/**
- * Class GSBIdeaStoryRelatedFacultyMigration
- *  - Migrate class for Idea Story Related Faculty migration.
- */
-class GSBIdeaStoryRelatedFacultyMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'nid' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-        'target_id' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFieldCollection::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFieldCollection(
-      'field_related_faculty',
-      array('host_entity_type' => 'node')
-    );
-
-    $this->addFieldMapping('host_entity_id', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-
-    $this->addFieldMapping('field_person_fac_single_ref', 'target_id');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[0] = array('nid', 'Nid');
-    $columns[1] = array('target_id', 'Related Faculty Nid');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    // Left here for debugging.
-    print $row->nid . "\n";
-
-    return TRUE;
-  }
-}
-
-/**
- * Class GSBIdeaStoryResourceImageMigration
- *  - Migrate class for Idea Story Resource Image migration.
- */
-class GSBIdeaStoryResourceImageMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'csvrownum' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFile::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFile('resource_image', 'MigrateFileUri');
-    $this->addFieldMapping('value', 'resource_image_uri');
-    // @todo: Add filename and type to available destination fields. Or consider resource_type field.
-    $this->addFieldMapping('filename', 'resource_image_name');
-    $this->addFieldMapping('type')->defaultValue('resource_image');
-
-    $this->addFieldMapping('resource_host_node', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[1] = array('nid', 'Idea Story NID');
-    $columns[24] = array('resource_image_name', 'Resource Name');
-    $columns[25] = array('resource_image_uri', 'Resource Image URI');
-    $columns[26] = array('resource_image_caption', 'Resource Image Caption');
-    $columns[27] = array('resource_image_alt', 'Resource Image Alt');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    if (empty($row->resource_image_uri)) {
-      return FALSE;
-    }
-    // Left here for debugging.
-    print $row->csvrownum . "\n";
-
-    return TRUE;
-  }
-}
-
-/**
- * Class GSBIdeaStoryResourceYoutubeMigration
- *  - Migrate class for Idea Story Resource Youtube migration.
- */
-class GSBIdeaStoryResourceYoutubeMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'csvrownum' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFile::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFile('resource_youtube', 'ResourcesResourcesFile');
-    //$this->addFieldMapping('value', 'resource_video_url');
-    $this->addFieldMapping('field_youtube_embed_code', 'resource_video_url');
-    $this->addFieldMapping('filename', 'resource_video_name');
-    $this->addFieldMapping('resource_type')->defaultValue('resource_youtube');
-
-    $this->addFieldMapping('resource_host_node', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[1] = array('nid', 'Idea Story NID');
-    $columns[22]  = array('resource_video_name', 'Resource Video Name');
-    $columns[23]  = array('resource_video_url', 'Resource Video URL');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    if (empty($row->resource_video_url)) {
-      return FALSE;
-    }
-    // Left here for debugging.
-    print $row->csvrownum . "\n";
-
-    return TRUE;
-  }
-}
-
-
-/**
- * Class GSBIdeaStoryResourceTwitterMigration
- *  - Migrate class for Idea Story Resource Twitter migration.
- */
-class GSBIdeaStoryResourceTwitterMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'csvrownum' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFile::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFile('resource_twitter', 'ResourcesResourcesFile');
-    $this->addFieldMapping('field_twitter_url', 'resource_twitter_url');
-    $this->addFieldMapping('filename', 'resource_twitter_name');
-    $this->addFieldMapping('resource_type')->defaultValue('resource_twitter');
-
-    $this->addFieldMapping('resource_host_node', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[1] = array('nid', 'Idea Story NID');
-    $columns[40]  = array('resource_twitter_name', 'Resource Twitter Name');
-    $columns[41]  = array('resource_twitter_url', 'Resource Twitter URL');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    if (empty($row->resource_twitter_url)) {
-      return FALSE;
-    }
-    // Left here for debugging.
-    print $row->csvrownum . "\n";
-
-    return TRUE;
-  }
-}
-
-/**
- * Class GSBIdeaStoryResourceYoutubeMigration
- *  - Migrate class for Idea Story Resource Youtube migration.
- */
-class GSBIdeaStoryResourceCalloutMigration extends Migration {
-  public function __construct(array $arguments) {
-    parent::__construct($arguments);
-    $this->dependencies = array('GSBIdeaStory');
-
-    // Create a MigrateSource object, which manages retrieving the input data.
-    $this->source = new MigrateSourceCSV($arguments['source_file'], $this->csvcolumns());
-    $this->map = new MigrateSQLMap($this->machineName,
-      array(
-        'csvrownum' => array(
-          'type' => 'int',
-          'not null' => TRUE,
-        ),
-      ),
-      MigrateDestinationFile::getKeySchema()
-    );
-
-    $this->destination = new MigrateDestinationFile('resource_pull_quote', 'ResourcesResourcesFile');
-    $this->addFieldMapping('filename', 'resource_callout_name');
-    $this->addFieldMapping('field_description', 'resource_callout_text');
-    $this->addFieldMapping('field_quote_author', 'resource_callout_attribution');
-    $this->addFieldMapping('resource_type')->defaultValue('resource_callout');
-
-    $this->addFieldMapping('resource_host_node', 'nid')
-      ->sourceMigration('GSBIdeaStory');
-  }
-
-  /**
-   * Define field names for CSV columns.
-   */
-  protected function csvcolumns() {
-    $columns[1] = array('nid', 'Idea Story NID');
-    $columns[28]  = array('resource_callout_name', 'Resource Callout Name');
-    $columns[29]  = array('resource_callout_text', 'Resource Callout Text');
-    $columns[30]  = array('resource_callout_attribution', 'Resource Callout Attribution');
-
-    return $columns;
-  }
-
-  function prepareRow($row) {
-    if (parent::prepareRow($row) === FALSE) {
-      return FALSE;
-    }
-
-    if (empty($row->resource_callout_name)) {
-      return FALSE;
-    }
-    // Left here for debugging.
-    print $row->csvrownum . "\n";
 
     return TRUE;
   }
