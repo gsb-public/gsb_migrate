@@ -288,7 +288,7 @@ function gsb_migrate_register_migrations() {
     'group_name' => 'announcement',
     'source_file' => $directory . 'announcement.csv',
   );
-  Migration::registerMigration(GSBSchoolStoryMigration, $main_migration, $common_arguments + array(
+  Migration::registerMigration('GSBSchoolStoryMigration', $main_migration, $common_arguments + array(
       'destination_type' => 'announcement',
     ));
 
