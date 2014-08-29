@@ -115,6 +115,20 @@ class GSBResourceImageMigration extends GSBResourceMigration {
   protected function required_fields() {
     return array('resource_image_name', 'resource_image_file');
   }
+
+  function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+
+    // Left here for debugging.
+    if (!empty($row->resource_image_file) && strpos($row->resource_image_file, 'imgur.com') !== FALSE) {
+      // URLs in CSV are of http://imgur.com/JYDJnfY format. We'll just dirty-convert them to publicly downloadable http://i.imgur.com/JYDJnfY.jpg
+      $row->resource_image_file = str_replace('imgur.com', 'i.imgur.com', $row->resource_image_file) . '.jpg';
+    }
+
+    return TRUE;
+  }
 }
 
 /**

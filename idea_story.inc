@@ -30,9 +30,11 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
       ->defaultValue(TRUE);
     $this->addFieldMapping('field_image_key_image:alt', 'key_image_alt');
     $this->addFieldMapping('field_link_unlimited', 'related_link_url')
-      ->separator(' | ');
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_link_unlimited:title', 'related_link_text')
-      ->separator(' | ');
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_key_taxonomy', 'key_taxonomy')
       ->separator('|')
       ->callbacks(
@@ -40,10 +42,9 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
         array('GSBMigrateHelper', 'keyTaxonomyTidsLookup')
       );
 
-    $this->addFieldMapping('field_person_fac_ref', 'related_faculty')
-      ->separator(' | ');
     $this->addFieldMapping('field_related_idea_story', 'related_story')
-      ->separator(' | ')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'))
       ->sourceMigration('GSBIdeaStory');
 
     $this->addFieldMapping('field_academic_area_unlimited', 'academic_area');
