@@ -148,9 +148,11 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
     }
 
     // Check Alumni Story checkbox if field_program_single is set.
-    if (!empty($row->alumni_program)) {
-      $row->alumni_story = TRUE;
-    }
+    $row->alumni_story = !empty($row->alumni_program) ? TRUE : FALSE;
+    // Check Business Magazine checkbox if field_program_single is set.
+    $row->part_of_business_magazine = !empty($row->stanford_business_year) ? TRUE : FALSE;
+    // Check Rethink checkbox if field_rethink_date is set.
+    $row->part_of_rethink = !empty($row->rethink_date) ? TRUE : FALSE;
 
     if (!empty($row->key_image) && strpos($row->key_image, 'imgur.com') !== FALSE) {
       // URLs in CSV are of http://imgur.com/JYDJnfY format. We'll just dirty-convert them to publicly downloadable http://i.imgur.com/JYDJnfY.jpg
@@ -160,16 +162,6 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
     // Avoid empty string lookup when creating stubs.
     if (empty($row->related_story)) {
       unset($row->related_story);
-    }
-
-    // Check Rethink checkbox if field_rethink_date is set.
-    if (!empty($row->rethink_date)) {
-      $row->part_of_rethink = TRUE;
-    }
-
-    // Check Business Magazine checkbox if field_program_single is set.
-    if (!empty($row->stanford_business_year)) {
-      $row->part_of_business_magazine = TRUE;
     }
 
     return TRUE;
