@@ -66,7 +66,7 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
       // For tags we want to create terms.
       ->defaultValue(TRUE);
 
-    $date_utility = new GSBMigrateDateUtility('m/d/y');
+    $date_utility = new GSBMigrateDateUtility('m-d-y');
     $this->addFieldMapping('field_rethink_date', 'rethink_date')
       ->callbacks(array($date_utility, 'convert'));
 
