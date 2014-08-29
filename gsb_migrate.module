@@ -281,6 +281,44 @@ function gsb_migrate_register_migrations() {
         'source_migration' => $main_migration,
     ));
   }
+
+  // School story group
+  $main_migration = 'GSBAnnouncement';
+  $common_arguments = array(
+    'group_name' => 'announcement',
+    'source_file' => $directory . 'announcement.csv',
+  );
+  Migration::registerMigration(GSBSchoolStoryMigration, $main_migration, $common_arguments + array(
+      'destination_type' => 'announcement',
+    ));
+
+  Migration::registerMigration('GSBRelatedFacultyMigration', $main_migration . 'RelatedFaculty', $common_arguments + array(
+      'destination_type' => 'field_related_faculty',
+      'dependencies' => array($main_migration),
+      'source_migration' => $main_migration,
+    ));
+
+  Migration::registerMigration('GSBRelatedContentMigration', $main_migration  . 'RelatedContent', $common_arguments + array(
+      'destination_type' => 'field_related_other_unlimited',
+      'dependencies' => array($main_migration),
+      'source_migration' => $main_migration,
+    ));
+
+  $resource_types = array(
+    'ResourceImage',
+    'ResourceYoutube',
+    'ResourceCallout',
+    'ResourceTwitter',
+  );
+
+  foreach ($resource_types as $resource_name) {
+    $machine_name = $main_migration . $resource_name;
+    $class_name = 'GSB' . $resource_name . 'Migration';
+    Migration::registerMigration($class_name, $machine_name, $common_arguments + array(
+        'dependencies' => array($main_migration),
+        'source_migration' => $main_migration,
+      ));
+  }
 }
 
 /**
