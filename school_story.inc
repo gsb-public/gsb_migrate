@@ -86,7 +86,11 @@ class GSBSchoolStoryMigration extends GSBCSVNodeMigration {
       ->callbacks('strtolower');
 
     $this->addFieldMapping('field_alumni_story', 'alumni_story');
-    $this->addFieldMapping('field_program_single', 'alumni_program');
+    $this->addFieldMapping('field_program_single', 'alumni_program')
+      // Use seoarator even if this field is singlevalued to correct errors when more than one value is supplied.
+      // It will take the first value in that case.
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_program_single:create_term')
       ->defaultValue(FALSE);
 

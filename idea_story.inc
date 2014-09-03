@@ -47,21 +47,33 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
       ->callbacks(array('GSBMigrateHelper', 'arrayTrim'))
       ->sourceMigration('GSBIdeaStory');
 
-    $this->addFieldMapping('field_academic_area_unlimited', 'academic_area');
+    $this->addFieldMapping('field_academic_area_unlimited', 'academic_area')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_academic_area_unlimited:create_term')
       ->defaultValue(FALSE);
-    $this->addFieldMapping('field_business_insight_topic', 'additional_topics');
+    $this->addFieldMapping('field_business_insight_topic', 'additional_topics')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_business_insight_topic:create_term')
       ->defaultValue(FALSE);
-    $this->addFieldMapping('field_region_of_interest', 'region');
+    $this->addFieldMapping('field_region_of_interest', 'region')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_region_of_interest:create_term')
       ->defaultValue(FALSE);
-    $this->addFieldMapping('field_centers_research_programs', 'circle');
+    $this->addFieldMapping('field_centers_research_programs', 'circle')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_centers_research_programs:create_term')
       ->defaultValue(FALSE);
     $this->addFieldMapping('field_tag', 'keywords')
-      // Tags are lowercase.
-      ->callbacks('strtolower');
+      ->separator('|')
+      ->callbacks(
+        // Tags are lowercase.
+        array('GSBMigrateHelper', 'arrayStrToLower'),
+        array('GSBMigrateHelper', 'arrayTrim')
+      );
     $this->addFieldMapping('field_tag:create_term')
       // For tags we want to create terms.
       ->defaultValue(TRUE);
@@ -82,7 +94,11 @@ class GSBIdeaStoryMigration extends GSBCSVNodeMigration {
       ->callbacks('strtolower');
 
     $this->addFieldMapping('field_alumni_story', 'alumni_story');
-    $this->addFieldMapping('field_program_single', 'alumni_program');
+    $this->addFieldMapping('field_program_single', 'alumni_program')
+      // Use seoarator even if this field is singlevalued to correct errors when more than one value is supplied.
+      // It will take the first value in that case.
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
     $this->addFieldMapping('field_program_single:create_term')
       ->defaultValue(FALSE);
 

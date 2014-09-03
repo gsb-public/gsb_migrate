@@ -108,6 +108,7 @@ class GSBResourceImageMigration extends GSBResourceMigration {
       ->defaultValue('public://resources');
     // @todo: Add filename and type to available destination fields. Or consider resource_type field.
     $this->addFieldMapping('filename', 'resource_image_name');
+    $this->addFieldMapping('field_body', 'resource_image_caption');
   }
 
   protected function columnsFromSource() {
