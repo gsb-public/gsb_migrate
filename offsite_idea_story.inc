@@ -11,7 +11,10 @@ class GSBOffsiteIdeaStoryMigration extends GSBCSVNodeMigration {
 
     $date_utility = new GSBMigrateDateUtility('n/j/Y');
     $this->addFieldMapping('field_date', 'publication_date')
-      ->callbacks(array($date_utility, 'convert'));
+      ->callbacks(
+        'trim',
+        array($date_utility, 'convert')
+      );
 
     $this->addFieldMapping('field_icon', 'source_format')
       ->callbacks('strtolower');
