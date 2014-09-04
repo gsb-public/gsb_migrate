@@ -244,6 +244,23 @@ function gsb_migrate_register_migrations() {
       'source_migration' => $main_migration,
   ));
 
+  // Offsite School Story group
+
+  $main_migration = 'GSBOffsiteSchoolStory';
+  $common_arguments = array(
+    'group_name' => 'offsite_school_story',
+    'source_file' => $directory . 'offsite_school_story.csv',
+  );
+  Migration::registerMigration('GSBOffsiteIdeaStoryMigration', $main_migration, $common_arguments + array(
+      'destination_type' => 'offsite_school_story',
+    ));
+
+  Migration::registerMigration('GSBRelatedFacultyMigration', $main_migration . 'RelatedFaculty', $common_arguments + array(
+      'destination_type' => 'field_related_faculty',
+      'dependencies' => array($main_migration),
+      'source_migration' => $main_migration,
+    ));
+
   // School story group
   $main_migration = 'GSBSchoolStory';
   $common_arguments = array(
@@ -319,6 +336,13 @@ function gsb_migrate_register_migrations() {
         'source_migration' => $main_migration,
       ));
   }
+
+  // Ranking
+  Migration::registerMigration('GSBRankingMigration', NULL, array(
+    'group_name' => 'ranking',
+    'source_file' => $directory . 'ranking.csv',
+    'destination_type' => 'ranking',
+  ));
 }
 
 /**
