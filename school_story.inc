@@ -94,6 +94,12 @@ class GSBSchoolStoryMigration extends GSBCSVNodeMigration {
     $this->addFieldMapping('field_program_single:create_term')
       ->defaultValue(FALSE);
 
+    $this->addFieldMapping('field_pr_contact_unlimited', 'pr_contact')
+      ->separator('|')
+      ->callbacks(array('GSBMigrateHelper', 'arrayTrim'));
+    $this->addFieldMapping('field_pr_contact_unlimited:create_term')
+      ->defaultValue(FALSE);
+
     // Create redirects.
     $this->addFieldMapping('migrate_redirects', 'path');
   }
