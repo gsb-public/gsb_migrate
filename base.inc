@@ -166,7 +166,7 @@ abstract class GSBCSVNodeMigration extends Migration {
   protected function createStub(Migration $migration, array $source_id) {
     $node = new stdClass();
     $node->title = t('Stub for @id', array('@id' => $source_id[0]));
-    $node->type = $this->destination->getBundle();
+    $node->type = $migration->destination->getBundle();
     $node->uid = 1;
     $node->status = 0;
     node_save($node);

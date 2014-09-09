@@ -104,6 +104,9 @@ class GSBResourceImageMigration extends GSBResourceMigration {
     // Override MigrateFile class here.
     $this->destination = new MigrateDestinationFile($this->arguments['destination_type'], 'MigrateFileUri');
     $this->addFieldMapping('value', 'resource_image_file');
+    // URLs are already encoded.
+    $this->addFieldMapping('urlencode')
+      ->defaultValue(FALSE);
     $this->addFieldMapping('destination_dir')
       ->defaultValue('public://resources');
     // @todo: Add filename and type to available destination fields. Or consider resource_type field.

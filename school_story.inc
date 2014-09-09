@@ -37,8 +37,13 @@ class GSBSchoolStoryMigration extends GSBCSVNodeMigration {
     $this->addFieldMapping('field_related_idea_story', 'related_story')
       ->separator('|')
       ->callbacks(array('GSBMigrateHelper', 'arrayTrim'))
-      // @todo: Field allows Announcement, Idea Story, School Story, Offsite School Story, Offsite Idea Story.
-      ->sourceMigration('GSBIdeaStory');
+      ->sourceMigration(array(
+        'GSBIdeaStory',
+        'GSBSchoolStory',
+        'GSBAnnouncement',
+        'GSBOffsiteSchoolStory',
+        'GSBOffsiteIdeaStory'
+      ));
 
     $this->addFieldMapping('field_academic_area_unlimited', 'academic_area')
       ->separator('|')
