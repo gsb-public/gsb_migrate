@@ -213,6 +213,10 @@ class GSBMigrateHelper {
     }
   }
 
+  public static function encodeSpaces($value) {
+    return str_replace(' ', '%20', trim($value));
+  }
+
   /**
    * Converts array members to lowercase.
    */

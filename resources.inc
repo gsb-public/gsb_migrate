@@ -103,7 +103,8 @@ class GSBResourceImageMigration extends GSBResourceMigration {
 
     // Override MigrateFile class here.
     $this->destination = new MigrateDestinationFile($this->arguments['destination_type'], 'MigrateFileUri');
-    $this->addFieldMapping('value', 'resource_image_file');
+    $this->addFieldMapping('value', 'resource_image_file')
+      ->callbacks(array('GSBMigrateHelper', 'encodeSpaces'));
     // URLs are already encoded.
     $this->addFieldMapping('urlencode')
       ->defaultValue(FALSE);

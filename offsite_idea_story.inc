@@ -9,7 +9,7 @@ class GSBOffsiteIdeaStoryMigration extends GSBCSVNodeMigration {
   public function __construct(array $arguments) {
     parent::__construct($arguments);
 
-    $date_utility = new GSBMigrateDateUtility('n/j/Y');
+    $date_utility = new GSBMigrateDateUtility('n/j/y g:i');
     $this->addFieldMapping('field_date', 'publication_date')
       ->callbacks(
         'trim',
