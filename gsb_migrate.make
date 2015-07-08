@@ -4,7 +4,7 @@ core = 7.x
 ; Add migrate suite
 
 ; Migrate
-projects[migrate][version] = 2.7
+projects[migrate][version] = 2.8
 projects[migrate][subdir] = contrib
 
 ; Drupal-to-Drupal data migration
