@@ -1,0 +1,24 @@
+{
+  "name": "drupal/gsb_migrate",
+  "description": "GSB Migrate",
+  "license": "Apache-2.0",  
+  "require": {
+    "php": ">=5.3.0",
+    "ext-curl": "*",
+    "ext-gd": "*",
+    "ext-json": "*",
+    "ext-openssl": "*",
+    "ext-pdo": "*",
+    "ext-xml": "*",
+    "cweagans/composer-patches": "^1.6.5",
+    "drupal/migrate": "2.11",
+    "drupal/migrate_d2d": "2.1"
+  },
+  "extra": {
+    "patches": {
+      "cweagans/composer-patches": {
+        "Call the preserve paths hooks" : "https://github.com/SebCorbin/composer-patches/commit/1cb9bacba51f8bba0c5f3f322c3bb61e4ceae974.patch"
+      }
+    }
+  }
+}
